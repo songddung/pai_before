@@ -1,0 +1,161 @@
+networks:
+  pai: {}
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: postgres
+    environment:
+      POSTGRES_DB: pai_db
+      POSTGRES_USER: pai_user
+      POSTGRES_PASSWORD: pai_pass
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: always
+    networks: [pai]
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+    restart: always
+    networks: [pai]
+    command: redis-server --save 20 1 --loglevel warning
+  user-service:
+    image: songhyunkwang/user-service:latest
+    container_name: user-service
+    env_file: [apps/user-service/.env]
+    environment:
+      PORT: 3001
+    expose:
+      - '3001'
+    restart: always
+    networks: [pai]
+
+  media-service:
+    image: songhyunkwang/media-service:latest
+    container_name: media-service
+    env_file: [apps/media-service/.env]
+    environment:
+      PORT: 3002
+    expose:
+      - '3002'
+    restart: always
+    networks: [pai]
+
+  ark-service:
+    image: songhyunkwang/ark-service:latest
+    container_name: ark-service
+    env_file: [apps/ark-service/.env]
+    environment:
+      PORT: 3003
+    expose:
+      - '3003'
+    restart: always
+    networks: [pai]
+
+  conversation-service:
+    image: songhyunkwang/conversation-service:latest
+    container_name: conversation-service
+    env_file: [apps/conversation-service/.env]
+    environment:
+      PORT: 3004
+    expose:
+      - '3004'
+    restart: always
+    networks: [pai]
+
+  quiz-service:
+    image: songhyunkwang/quiz-service:latest
+    container_name: quiz-service
+    env_file: [apps/quiz-service/.env]
+    environment:
+      PORT: 3005
+    expose:
+      - '3005'
+    restart: always
+    networks: [pai]
+
+  ai-service:
+    image: songhyunkwang/ai-service:latest
+    container_name: ai-service
+    env_file: [apps/AI_integration/.env]
+    environment:
+      PORT: 8000
+      CUDA_VISIBLE_DEVICES: '' # Force CPU-only mode
+    expose:
+      - '8000'
+    restart: always
+    networks: [pai]
+    volumes:
+      - ai_data:/app/unified_server/data
+      - ai_models:/app/unified_server/models
+    labels:
+      - 'traefik.enable=true'
+      # AI 서비스는 /tts, /vqa 경로로 직접 접근 가능
+      - 'traefik.http.routers.ai-service.rule=Host(`j13c101.p.ssafy.io`) && (PathPrefix(`/tts`) || PathPrefix(`/vqa`))'
+      - 'traefik.http.routers.ai-service.entrypoints=websecure'
+      - 'traefik.http.routers.ai-service.tls=true'
+      - 'traefik.http.routers.ai-service.tls.certresolver=letsencrypt'
+      - 'traefik.http.services.ai-service.loadbalancer.server.port=8000'
+
+  gateway:
+    image: songhyunkwang/gateway:latest
+    container_name: gateway
+    env_file: [apps/gateway/.env]
+    environment:
+      PORT: 3006
+    expose:
+      - '3006'
+    restart: always
+    networks: [pai]
+    labels:
+      - 'traefik.enable=true'
+      # 라우터: Host+PathPrefix(/api, /tts, /vqa)
+      # - 'traefik.http.routers.gateway.rule=Host(`ggalong.me`) && (PathPrefix(`/api`) || PathPrefix(`/tts`) || PathPrefix(`/vqa`))'
+      # - "traefik.http.routers.gateway.rule=Host(`darami.life`) && (PathPrefix(`/api`) || PathPrefix(`/tts`) || PathPrefix(`/vqa`))"
+      - 'traefik.http.routers.gateway.rule=Host(`j13c101.p.ssafy.io`) && (PathPrefix(`/api`) || PathPrefix(`/tts`) || PathPrefix(`/vqa`))'
+      - 'traefik.http.routers.gateway.entrypoints=websecure'
+      - 'traefik.http.routers.gateway.tls=true'
+      - 'traefik.http.routers.gateway.tls.certresolver=letsencrypt'
+      # ★ 백엔드 실제 내부 포트 (중요)
+      - 'traefik.http.services.gateway.loadbalancer.server.port=${GATEWAY_PORT}'
+      # ★ /api 접두어 제거 미들웨어
+      # - "traefik.http.middlewares.strip-api.stripprefix.prefixes=/api"
+      # - "traefik.http.routers.gateway.middlewares=strip-api@docker"
+
+  traefik:
+    image: traefik:v3.1
+    container_name: traefik
+    command:
+      - '--providers.docker=true'
+      - '--providers.docker.exposedbydefault=false'
+      - '--entrypoints.web.address=:80'
+      - '--entrypoints.websecure.address=:443'
+      # HTTP -> HTTPS 리다이렉트
+      - '--entrypoints.web.http.redirections.entryPoint.to=websecure'
+      - '--entrypoints.web.http.redirections.entryPoint.scheme=https'
+      # Let's Encrypt (HTTP-01)
+      - '--certificatesresolvers.letsencrypt.acme.httpchallenge=true'
+      - '--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web'
+      - '--certificatesresolvers.letsencrypt.acme.email=shk8476@gmail.com'
+      - '--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json'
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - '/var/run/docker.sock:/var/run/docker.sock:ro'
+      - './letsencrypt:/letsencrypt'
+    restart: always
+    networks: [pai]
+
+volumes:
+  postgres_data:
+  redis_data:
+  ai_data:
+  ai_models:

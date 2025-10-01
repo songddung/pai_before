@@ -1,0 +1,60 @@
+# node_modules
+# npm-debug.log
+# .git
+# .gitignore
+# .nx
+# dist
+# FE/node_modules
+# BE/node_modules/@be
+
+# VCS / OS / IDE
+.git
+.gitignore
+.DS_Store
+*.swp
+.vscode
+.idea
+
+# Env & secrets (이미지는 변수로 주입하자)
+.env
+.env.*
+!.env.example
+
+# Node / 패키지 캐시
+**/node_modules
+**/npm-debug.log*
+**/yarn-error.log*
+**/pnpm-debug.log*
+**/.pnpm-store
+**/.npm
+**/.cache
+**/.eslintcache
+**/.turbo
+
+# 빌드 산출물
+**/dist
+**/build
+**/.next
+**/out
+**/coverage
+
+# Nx 캐시/임시
+.nx
+.nx/cache
+tmp
+**/tmp
+
+# 테스트(이미지에 필요 없으면)
+**/__tests__/**
+**/*.spec.*
+**/*.test.*
+
+# 문서/미디어(필요 없으면)
+docs
+**/screenshots
+*.tgz
+
+dist/*
+!dist/shared-types
+FE/node_modules
+BE/node_modules/@be

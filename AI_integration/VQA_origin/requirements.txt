@@ -1,0 +1,17 @@
+# Requirements for the KMK VQA application.
+
+# Web Framework & Server
+fastapi==0.109.2
+uvicorn==0.27.1
+
+# AI/ML Libraries (compatible versions)
+transformers==4.30.2
+torch==2.0.1
+
+# Utilities
+Pillow==10.2.0
+googletrans==4.0.0-rc1
+python-multipart
+dotenv
+opencv-python
+ultralytics

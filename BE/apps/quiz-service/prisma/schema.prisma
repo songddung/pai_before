@@ -1,0 +1,44 @@
+generator client {
+  provider      = "prisma-client-js"
+  output        = "../generated/client"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Quiz {
+  id        BigInt   @id @default(autoincrement())
+  parentId  BigInt   @map("parent_id")
+  question  String   @map("question")
+  answer    String   @map("answer")
+  reward    String?  @map("reward")
+  QuizDate  DateTime @map("quiz_date")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  results QuizResult[]
+
+  @@unique([parentId, QuizDate])
+  @@index([parentId, isActive])
+  @@map("quizzes")
+}
+
+model QuizResult {
+  id            BigInt    @id @default(autoincrement())
+  quizId        BigInt    @map("quiz_id")
+  childId       BigInt    @map("child_id")
+  totalAttempts Int       @map("total_attempts")
+  isSolved      Boolean   @default(false) @map("is_solved")
+  startedAt     DateTime  @map("started_at")
+  completedAt   DateTime? @map("completed_at")
+  rewardGiven   Boolean   @default(false) @map("reward_given")
+
+  quiz Quiz @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  @@unique([quizId, childId])
+  @@index([quizId, childId])
+  @@map("quiz_results")
+}

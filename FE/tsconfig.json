@@ -1,0 +1,20 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "paths": {
+      "@/*": ["./src/*"],
+      "@shared-types": ["../dist/shared-types/src"],
+      "@/components/themed-text": ["./src/shared/ui/atoms/Text"],
+      "@/components/themed-view": ["./src/shared/ui/atoms/View"],
+      "@/components/external-link": ["./src/shared/ui/molecules/ExternalLink"],
+      "@/components/parallax-scroll-view": [
+        "./src/shared/ui/organisms/ParallaxScrollView"
+      ],
+      "@/components/ui/collapsible": ["./src/shared/ui/molecules/Collapsible"],
+      "@/components/ui/icon-symbol": ["./src/shared/ui/organisms/IconSymbol"],
+      "@/components/*": ["./src/components/*"]
+    }
+  },
+  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"]
+}

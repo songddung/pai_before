@@ -1,0 +1,10 @@
+{
+    "nxConsole.generateAiAgentRules": true,
+    "files.watcherExclude": {
+        "**/node_modules/**": true,
+        "**/dist/**": true,
+        "**/build/**": true,
+        "**/.git/**": true
+    },
+
+}

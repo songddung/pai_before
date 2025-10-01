@@ -1,0 +1,34 @@
+{
+  "scripts": {
+    "build:shared-types": "nx build shared-types",
+    "build": "npm run build:shared-types"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.8.0",
+    "@nx/eslint": "^21.4.1",
+    "@nx/eslint-plugin": "21.4.1",
+    "@nx/js": "^21.4.1",
+    "@swc-node/register": "~1.9.1",
+    "@swc/core": "~1.5.7",
+    "@swc/helpers": "~0.5.11",
+    "@types/multer": "^2.0.0",
+    "@types/node": "20.19.9",
+    "@types/react": "~19.1.10",
+    "eslint": "^9.35.0",
+    "eslint-config-prettier": "^10.0.0",
+    "eslint-plugin-prettier": "^4.2.5",
+    "jsonc-eslint-parser": "^2.1.0",
+    "prettier": "^3.6.2",
+    "tslib": "^2.3.0",
+    "typescript": "~5.8.2",
+    "typescript-eslint": "^8.29.0"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.884.0",
+    "@nestjs/config": "^4.0.2",
+    "@nestjs/platform-express": "^11.1.6",
+    "expo": "^54.0.8",
+    "multer": "^2.0.2",
+    "uuid": "^13.0.0"
+  }
+}

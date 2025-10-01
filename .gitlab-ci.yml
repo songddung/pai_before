@@ -1,0 +1,673 @@
+stages:
+  - test
+  - detect-changes
+  - build
+  - deploy
+
+variables:
+  DOCKER_IMAGE_PREFIX: 'songhyunkwang'
+  DOCKER_DRIVER: overlay2
+  # Docker BuildKit 활성화
+  DOCKER_BUILDKIT: 1
+  BUILDKIT_PROGRESS: plain
+  # Git 설정
+  GIT_DEPTH: 0 # 얕은 클론 방지
+  GIT_STRATEGY: fetch
+
+# 1) 테스트 단계
+test:
+  stage: test
+  image: node:20
+  script:
+    - echo "Running tests for changed services..."
+    # 여기에 나중에 실제 테스트 추가
+    - echo "Tests completed"
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_BRANCH == "sub"' # 테스트용 브랜치
+  tags:
+    - docker
+
+# 2) 변경 감지 단계
+detect-changes:
+  stage: detect-changes
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache git bash
+  script:
+    - echo "Detecting changed services..."
+    - echo "Current commit:$CI_COMMIT_SHA"
+    - echo "Branch:$CI_COMMIT_BRANCH"
+    - |
+      # 이전 커밋과 비교하여 변경된 파일 목록 가져오기
+      if [ "$CI_COMMIT_BRANCH" = "develop" ] || [ "$CI_COMMIT_BRANCH" = "main" ] || [ "$CI_COMMIT_BRANCH" = "sub" ]; then
+        # develop/master 브랜치: 이전 커밋과 비교 (fallback 포함)
+        if git rev-parse HEAD~1 >/dev/null 2>&1; then
+          CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
+        else
+          echo "No previous commit found, treating as initial commit"
+          CHANGED_FILES=$(git ls-files)
+        fi
+      else
+        # 다른 브랜치: develop과 비교
+        git fetch origin develop:develop 2>/dev/null || git fetch origin develop 2>/dev/null || true
+        if git rev-parse develop >/dev/null 2>&1; then
+          CHANGED_FILES=$(git diff --name-only develop...HEAD)
+        else
+          echo "develop branch not found, using all files"
+          CHANGED_FILES=$(git ls-files)
+        fi
+      fi
+    - echo "Changed files:"
+    - echo "$CHANGED_FILES"
+    - |
+      # 초기값 설정
+      echo "USER_SERVICE_CHANGED=false" > changes.env
+      echo "MEDIA_SERVICE_CHANGED=false" >> changes.env
+      echo "ARK_SERVICE_CHANGED=false" >> changes.env
+      echo "CONVERSATION_SERVICE_CHANGED=false" >> changes.env
+      echo "QUIZ_SERVICE_CHANGED=false" >> changes.env
+      echo "AI_SERVICE_CHANGED=false" >> changes.env
+      echo "GATEWAY_CHANGED=false" >> changes.env
+      echo "SHARED_CHANGED=false" >> changes.env
+    - |
+      # 공통/공유 파일 패턴 (이것들이 변경되면 모든 서비스 재빌드)
+      SHARED_PATTERNS="package\.json|package-lock\.json|yarn\.lock|shared-types/|BE/package\.json|BE/libs/|tsconfig|\.env|docker-compose|Dockerfile\.base|nx\.json|\.gitlab-ci\.yml|infra/"
+
+      if echo "$CHANGED_FILES" | grep -E "$SHARED_PATTERNS" > /dev/null 2>&1; then
+        echo "Shared files changed, rebuilding all services"
+        echo "USER_SERVICE_CHANGED=true" > changes.env
+        echo "MEDIA_SERVICE_CHANGED=true" >> changes.env
+        echo "ARK_SERVICE_CHANGED=true" >> changes.env
+        echo "CONVERSATION_SERVICE_CHANGED=true" >> changes.env
+        echo "QUIZ_SERVICE_CHANGED=true" >> changes.env
+        echo "AI_SERVICE_CHANGED=true" >> changes.env
+        echo "GATEWAY_CHANGED=true" >> changes.env
+        echo "SHARED_CHANGED=true" >> changes.env
+      else
+        # 개별 서비스 변경 확인 (기존 false 값을 덮어쓰기)
+        if echo "$CHANGED_FILES" | grep "BE/apps/user-service/" > /dev/null 2>&1; then
+          sed -i 's/USER_SERVICE_CHANGED=false/USER_SERVICE_CHANGED=true/' changes.env
+        fi
+        if echo "$CHANGED_FILES" | grep "BE/apps/media-service/" > /dev/null 2>&1; then
+          sed -i 's/MEDIA_SERVICE_CHANGED=false/MEDIA_SERVICE_CHANGED=true/' changes.env
+        fi
+        if echo "$CHANGED_FILES" | grep "BE/apps/ark-service/" > /dev/null 2>&1; then
+          sed -i 's/ARK_SERVICE_CHANGED=false/ARK_SERVICE_CHANGED=true/' changes.env
+        fi
+        if echo "$CHANGED_FILES" | grep "BE/apps/conversation-service/" > /dev/null 2>&1; then
+          sed -i 's/CONVERSATION_SERVICE_CHANGED=false/CONVERSATION_SERVICE_CHANGED=true/' changes.env
+        fi
+        if echo "$CHANGED_FILES" | grep "BE/apps/quiz-service/" > /dev/null 2>&1; then
+          sed -i 's/QUIZ_SERVICE_CHANGED=false/QUIZ_SERVICE_CHANGED=true/' changes.env
+        fi
+        if echo "$CHANGED_FILES" | grep "BE/apps/gateway/" > /dev/null 2>&1; then
+          sed -i 's/GATEWAY_CHANGED=false/GATEWAY_CHANGED=true/' changes.env
+        fi
+        if echo "$CHANGED_FILES" | grep "AI_integration/" > /dev/null 2>&1; then
+          sed -i 's/AI_SERVICE_CHANGED=false/AI_SERVICE_CHANGED=true/' changes.env
+        fi
+      fi
+    - echo "=== Change Detection Results ==="
+    - cat changes.env
+  artifacts:
+    reports:
+      dotenv: changes.env
+    expire_in: 1 hour
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_BRANCH == "sub"' # 테스트용 브랜치
+  tags:
+    - docker
+
+# 3) 개별 서비스 빌드 작업들
+build-user-service:
+  stage: build
+  image: docker:24.0.5
+  services:
+    - docker:24.0.5-dind
+  variables:
+    DOCKER_HOST: 'tcp://docker:2375'
+    DOCKER_TLS_CERTDIR: ''
+  before_script:
+    - apk add --no-cache nodejs npm
+  script:
+    - |
+      # 스크립트 가드: 변경사항이 없으면 건너뛰기
+      if [ "$USER_SERVICE_CHANGED" != "true" ]; then
+        echo "user-service has no changes, skipping build"
+        exit 0
+      fi
+    - echo "Installing dependencies and building shared-types..."
+    - npm ci
+    - cd shared-types && npm ci && cd ..
+    - npx nx build shared-types
+    - echo "Checking dist folder..."
+    - ls -la dist/
+    - echo "Building user-service..."
+    - docker build -f BE/apps/user-service/Dockerfile -t $DOCKER_IMAGE_PREFIX/user-service:latest -t $DOCKER_IMAGE_PREFIX/user-service:$CI_COMMIT_SHA .
+    - echo "$DOCKERHUB_PASSWORD" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+    - docker push $DOCKER_IMAGE_PREFIX/user-service:latest
+    - docker push $DOCKER_IMAGE_PREFIX/user-service:$CI_COMMIT_SHA
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_BRANCH == "sub"' # 테스트용 브랜치
+  needs:
+    - job: detect-changes
+      artifacts: true
+  tags:
+    - docker
+
+build-media-service:
+  stage: build
+  image: docker:24.0.5
+  services:
+    - docker:24.0.5-dind
+  variables:
+    DOCKER_HOST: 'tcp://docker:2375'
+    DOCKER_TLS_CERTDIR: ''
+  before_script:
+    - apk add --no-cache nodejs npm
+  script:
+    - |
+      if [ "$MEDIA_SERVICE_CHANGED" != "true" ]; then
+        echo "media-service has no changes, skipping build"
+        exit 0
+      fi
+    - echo "Installing dependencies and building shared-types..."
+    - npm ci
+    - cd shared-types && npm ci && cd ..
+    - npx nx build shared-types
+    - echo "Building media-service..."
+    - docker build -f BE/apps/media-service/Dockerfile -t $DOCKER_IMAGE_PREFIX/media-service:latest -t $DOCKER_IMAGE_PREFIX/media-service:$CI_COMMIT_SHA .
+    - echo "$DOCKERHUB_PASSWORD" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+    - docker push $DOCKER_IMAGE_PREFIX/media-service:latest
+    - docker push $DOCKER_IMAGE_PREFIX/media-service:$CI_COMMIT_SHA
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_BRANCH == "sub"' # 테스트용 브랜치
+  needs:
+    - job: detect-changes
+      artifacts: true
+  tags:
+    - docker
+
+build-ark-service:
+  stage: build
+  image: docker:24.0.5
+  services:
+    - docker:24.0.5-dind
+  variables:
+    DOCKER_HOST: 'tcp://docker:2375'
+    DOCKER_TLS_CERTDIR: ''
+  before_script:
+    - apk add --no-cache nodejs npm
+  script:
+    - |
+      if [ "$ARK_SERVICE_CHANGED" != "true" ]; then
+        echo "ark-service has no changes, skipping build"
+        exit 0
+      fi
+    - echo "Installing dependencies and building shared-types..."
+    - npm ci
+    - cd shared-types && npm ci && cd ..
+    - npx nx build shared-types
+    - echo "Checking dist folder..."
+    - ls -la dist/
+    - echo "Building ark-service..."
+    - docker build -f BE/apps/ark-service/Dockerfile -t $DOCKER_IMAGE_PREFIX/ark-service:latest -t $DOCKER_IMAGE_PREFIX/ark-service:$CI_COMMIT_SHA .
+    - echo "$DOCKERHUB_PASSWORD" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+    - docker push $DOCKER_IMAGE_PREFIX/ark-service:latest
+    - docker push $DOCKER_IMAGE_PREFIX/ark-service:$CI_COMMIT_SHA
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_BRANCH == "sub"' # 테스트용 브랜치
+  needs:
+    - job: detect-changes
+      artifacts: true
+  tags:
+    - docker
+
+build-conversation-service:
+  stage: build
+  image: docker:24.0.5
+  services:
+    - docker:24.0.5-dind
+  variables:
+    DOCKER_HOST: 'tcp://docker:2375'
+    DOCKER_TLS_CERTDIR: ''
+  before_script:
+    - apk add --no-cache nodejs npm
+  script:
+    - |
+      if [ "$CONVERSATION_SERVICE_CHANGED" != "true" ]; then
+        echo "conversation-service has no changes, skipping build"
+        exit 0
+      fi
+    - echo "Installing dependencies and building shared-types..."
+    - npm ci
+    - cd shared-types && npm ci && cd ..
+    - npx nx build shared-types
+    - echo "Checking dist folder..."
+    - ls -la dist/
+    - echo "Building conversation-service..."
+    - docker build -f BE/apps/conversation-service/Dockerfile -t $DOCKER_IMAGE_PREFIX/conversation-service:latest -t $DOCKER_IMAGE_PREFIX/conversation-service:$CI_COMMIT_SHA .
+    - echo "$DOCKERHUB_PASSWORD" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+    - docker push $DOCKER_IMAGE_PREFIX/conversation-service:latest
+    - docker push $DOCKER_IMAGE_PREFIX/conversation-service:$CI_COMMIT_SHA
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_BRANCH == "sub"' # 테스트용 브랜치
+  needs:
+    - job: detect-changes
+      artifacts: true
+  tags:
+    - docker
+
+build-quiz-service:
+  stage: build
+  image: docker:24.0.5
+  services:
+    - docker:24.0.5-dind
+  variables:
+    DOCKER_HOST: 'tcp://docker:2375'
+    DOCKER_TLS_CERTDIR: ''
+  before_script:
+    - apk add --no-cache nodejs npm
+  script:
+    - |
+      if [ "$QUIZ_SERVICE_CHANGED" != "true" ]; then
+        echo "quiz-service has no changes, skipping build"
+        exit 0
+      fi
+    - echo "Installing dependencies and building shared-types..."
+    - npm ci
+    - cd shared-types && npm ci && cd ..
+    - npx nx build shared-types
+    - echo "Checking dist folder..."
+    - ls -la dist/
+    - echo "Building quiz-service..."
+    - docker build -f BE/apps/quiz-service/Dockerfile -t $DOCKER_IMAGE_PREFIX/quiz-service:latest -t $DOCKER_IMAGE_PREFIX/quiz-service:$CI_COMMIT_SHA .
+    - echo "$DOCKERHUB_PASSWORD" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+    - docker push $DOCKER_IMAGE_PREFIX/quiz-service:latest
+    - docker push $DOCKER_IMAGE_PREFIX/quiz-service:$CI_COMMIT_SHA
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_BRANCH == "sub"' # 테스트용 브랜치
+  needs:
+    - job: detect-changes
+      artifacts: true
+  tags:
+    - docker
+
+build-ai-service:
+  stage: build
+  image: docker:24.0.5
+  services:
+    - docker:24.0.5-dind
+  variables:
+    DOCKER_HOST: 'tcp://docker:2375'
+    DOCKER_TLS_CERTDIR: ''
+  script:
+    - |
+      if [ "$AI_SERVICE_CHANGED" != "true" ]; then
+        echo "ai-service has no changes, skipping build"
+        exit 0
+      fi
+    - echo "Building ai-service..."
+    - docker build -f AI_integration/Dockerfile -t $DOCKER_IMAGE_PREFIX/ai-service:latest -t $DOCKER_IMAGE_PREFIX/ai-service:$CI_COMMIT_SHA ./AI_integration
+    - echo "$DOCKERHUB_PASSWORD" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+    - docker push $DOCKER_IMAGE_PREFIX/ai-service:latest
+    - docker push $DOCKER_IMAGE_PREFIX/ai-service:$CI_COMMIT_SHA
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_BRANCH == "sub"' # 테스트용 브랜치
+    - if: '$CI_COMMIT_BRANCH == "feature/BE-users"'
+  needs:
+    - job: detect-changes
+      artifacts: true
+  tags:
+    - docker
+
+build-gateway:
+  stage: build
+  image: docker:24.0.5
+  services:
+    - docker:24.0.5-dind
+  variables:
+    DOCKER_HOST: 'tcp://docker:2375'
+    DOCKER_TLS_CERTDIR: ''
+  script:
+    - |
+      if [ "$GATEWAY_CHANGED" != "true" ]; then
+        echo "gateway has no changes, skipping build"
+        exit 0
+      fi
+    - echo "Building gateway..."
+    - docker build -f BE/apps/gateway/Dockerfile -t $DOCKER_IMAGE_PREFIX/gateway:latest -t $DOCKER_IMAGE_PREFIX/gateway:$CI_COMMIT_SHA .
+    - echo "$DOCKERHUB_PASSWORD" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+    - docker push $DOCKER_IMAGE_PREFIX/gateway:latest
+    - docker push $DOCKER_IMAGE_PREFIX/gateway:$CI_COMMIT_SHA
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_BRANCH == "sub"' # 테스트용 브랜치
+  needs:
+    - job: detect-changes
+      artifacts: true
+  tags:
+    - docker
+
+# 4) 배포 단계 - 순차적 서비스 재시작
+deploy:
+  stage: deploy
+  # image: alpine:latest 09.24 갑자기 왜 바뀌었냐 진짜 개빡치네
+  image: ubuntu:22.04
+  before_script:
+    - apt-get update && apt-get install -y openssh-client curl jq
+    - eval $(ssh-agent -s)
+    - echo "$SSH_PRIVATE_KEY" | base64 -d | tr -d '\r' > /tmp/ssh_key_test && chmod 600 /tmp/ssh_key_test
+    - ssh-keygen -y -f /tmp/ssh_key_test > /dev/null || echo "INVALID_OR_PASSPHRASE"
+    - rm /tmp/ssh_key_test
+    - echo "$SSH_PRIVATE_KEY" | base64 -d | tr -d '\r' > /tmp/ssh_key
+    - chmod 600 /tmp/ssh_key
+    - ssh-add /tmp/ssh_key
+    - mkdir -p ~/.ssh && chmod 700 ~/.ssh
+    - ssh-keyscan -H j13c101.p.ssafy.io >> ~/.ssh/known_hosts
+  script:
+    - echo "Deploying services with changes..."
+    - |
+      # 변경된 서비스 목록 수집
+      SERVICES_TO_DEPLOY=""
+      [ "$USER_SERVICE_CHANGED" = "true" ] && SERVICES_TO_DEPLOY="$SERVICES_TO_DEPLOY user-service"
+      [ "$MEDIA_SERVICE_CHANGED" = "true" ] && SERVICES_TO_DEPLOY="$SERVICES_TO_DEPLOY media-service"
+      [ "$ARK_SERVICE_CHANGED" = "true" ] && SERVICES_TO_DEPLOY="$SERVICES_TO_DEPLOY ark-service"
+      [ "$CONVERSATION_SERVICE_CHANGED" = "true" ] && SERVICES_TO_DEPLOY="$SERVICES_TO_DEPLOY conversation-service"
+      [ "$QUIZ_SERVICE_CHANGED" = "true" ] && SERVICES_TO_DEPLOY="$SERVICES_TO_DEPLOY quiz-service"
+      [ "$AI_SERVICE_CHANGED" = "true" ] && SERVICES_TO_DEPLOY="$SERVICES_TO_DEPLOY ai-service"
+      [ "$GATEWAY_CHANGED" = "true" ] && SERVICES_TO_DEPLOY="$SERVICES_TO_DEPLOY gateway"
+
+      echo "Services to deploy: $SERVICES_TO_DEPLOY"
+
+      if [ -z "$SERVICES_TO_DEPLOY" ]; then
+        echo "No services to deploy, skipping deployment"
+        exit 0
+      fi
+
+      # 순차적 배포를 위한 서비스 우선순위 (의존성 고려)
+      # 1. 백엔드 서비스들 먼저 (gateway 제외)
+      # 2. gateway 마지막 (프록시 역할)
+      SERVICE_ORDER="user-service media-service ark-service conversation-service quiz-service ai-service gateway"
+
+      ssh -o StrictHostKeyChecking=yes ubuntu@j13c101.p.ssafy.io "
+        set -e
+        cd ~ &&
+
+        # 배포 대상 서비스 목록 (GitLab CI에서 전달)
+        TARGETS=\"$SERVICES_TO_DEPLOY\"
+        echo 'Starting deployment process...' &&
+        echo \"Target services: \$TARGETS\" &&
+
+        # TARGETS가 비어있으면 종료
+        if [ -z \"\$TARGETS\" ]; then
+          echo 'No services to deploy, exiting'
+          exit 0
+        fi &&
+
+        # 배포 전 환경 검증
+        echo 'Validating deployment environment...' &&
+        ls -la &&
+        pwd &&
+        echo 'Checking docker-compose.yml...' &&
+        if [ ! -f docker-compose.yml ]; then
+          echo 'ERROR: docker-compose.yml not found!'
+          exit 1
+        fi &&
+        echo 'Validating docker-compose configuration...' &&
+        docker compose config -q &&
+
+        # 전체 이미지 pull 먼저 수행
+        echo 'Pulling latest images...' &&
+        docker compose pull \$TARGETS &&
+
+        # 순차적으로 서비스 재시작
+        SERVICE_ORDER=\"user-service media-service ark-service conversation-service quiz-service ai-service gateway\"
+        for service in \$SERVICE_ORDER; do
+          if echo \" \$TARGETS \" | grep -Fq \" \$service \"; then
+            echo \"=== Deploying \$service ===\" &&
+
+            # 헬스체크가 있다면 이전 상태 확인
+            if docker compose ps \$service --format json 2>/dev/null | grep -q '\"Health\":\"healthy\"'; then
+              echo \"\$service is currently healthy\"
+            fi &&
+
+            # 서비스별 마이그레이션 실행 (서비스 재시작 전)
+            if [ \"\$service\" = \"user-service\" ] && echo \" \$TARGETS \" | grep -Fq \" user-service \"; then
+              echo \"Running user-service database migration...\" &&
+              docker compose up -d --no-deps user-service &&
+              sleep 5 &&
+              docker exec --user root user-service npx prisma migrate deploy
+            elif [ \"\$service\" = \"media-service\" ] && echo \" \$TARGETS \" | grep -Fq \" media-service \"; then
+              echo \"Running media-service database migration...\" &&
+              docker compose up -d --no-deps media-service &&
+              sleep 5 &&
+              docker exec --user root media-service npx prisma migrate deploy
+            elif [ \"\$service\" = \"ark-service\" ] && echo \" \$TARGETS \" | grep -Fq \" ark-service \"; then
+              echo \"Running ark-service database migration...\" &&
+              docker compose up -d --no-deps ark-service &&
+              sleep 5 &&
+              docker exec --user root ark-service npx prisma migrate deploy
+            elif [ \"\$service\" = \"conversation-service\" ] && echo \" \$TARGETS \" | grep -Fq \" conversation-service \"; then
+              echo \"Running conversation-service database migration...\" &&
+              docker compose up -d --no-deps conversation-service &&
+              sleep 5 &&
+              docker exec --user root conversation-service npx prisma migrate deploy
+            elif [ \"\$service\" = \"quiz-service\" ] && echo \" \$TARGETS \" | grep -Fq \" quiz-service \"; then
+              echo \"Running quiz-service database migration...\" &&
+              docker compose up -d --no-deps quiz-service &&
+              sleep 5 &&
+              docker exec --user root quiz-service npx prisma migrate deploy
+            else
+              # Gateway나 마이그레이션이 필요없는 서비스는 일반 재시작
+              echo \"Starting \$service...\" &&
+              docker compose up -d --no-deps \$service
+            fi &&
+
+            # 잠시 대기 (서비스 시작 시간 고려)
+            echo \"Waiting for \$service to start...\" &&
+            sleep 10 &&
+
+            # 새 컨테이너 상태 확인
+            echo \"Checking \$service status...\" &&
+            docker compose ps \$service &&
+            if ! docker compose ps \$service --format json | grep -q '\"State\":\"running\"'; then
+              echo \"ERROR: \$service failed to start properly\" &&
+              echo \"Container logs:\" &&
+              docker compose logs --tail=50 \$service &&
+              exit 1
+            fi &&
+
+            echo \"\$service deployed successfully\" &&
+            echo \"---\"
+          fi
+        done &&
+
+        echo 'Cleaning up unused images...' &&
+        docker image prune -f &&
+
+        echo 'Deployment completed successfully!'
+      "
+
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+    - if: '$CI_COMMIT_BRANCH == "sub"' # 테스트용 브랜치
+  resource_group: deployment
+  needs:
+    - job: detect-changes
+      artifacts: true
+    - job: build-user-service
+      optional: true
+    - job: build-media-service
+      optional: true
+    - job: build-ark-service
+      optional: true
+    - job: build-conversation-service
+      optional: true
+    - job: build-quiz-service
+      optional: true
+    - job: build-gateway
+      optional: true
+  tags:
+    - docker
+
+# 5) 프로덕션 배포 (master 브랜치만) - 더 엄격한 배포 프로세스
+deploy-production:
+  stage: deploy
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache openssh curl jq
+    - eval $(ssh-agent -s)
+    - echo "$SSH_PRIVATE_KEY" | base64 -d | tr -d '\r' > /tmp/ssh_key
+    - chmod 600 /tmp/ssh_key
+    - ssh-add /tmp/ssh_key
+    - mkdir -p ~/.ssh && chmod 700 ~/.ssh
+    - ssh-keyscan -H j13c101.p.ssafy.io >> ~/.ssh/known_hosts
+  script:
+    - echo "🚀 Starting PRODUCTION deployment..."
+    - |
+      # 변경된 서비스 확인
+      PROD_SERVICES=""
+      [ "$USER_SERVICE_CHANGED" = "true" ] && PROD_SERVICES="$PROD_SERVICES user-service"
+      [ "$MEDIA_SERVICE_CHANGED" = "true" ] && PROD_SERVICES="$PROD_SERVICES media-service"
+      [ "$ARK_SERVICE_CHANGED" = "true" ] && PROD_SERVICES="$PROD_SERVICES ark-service"
+      [ "$CONVERSATION_SERVICE_CHANGED" = "true" ] && PROD_SERVICES="$PROD_SERVICES conversation-service"
+      [ "$QUIZ_SERVICE_CHANGED" = "true" ] && PROD_SERVICES="$PROD_SERVICES quiz-service"
+      [ "$AI_SERVICE_CHANGED" = "true" ] && PROD_SERVICES="$PROD_SERVICES ai-service"
+      [ "$GATEWAY_CHANGED" = "true" ] && PROD_SERVICES="$PROD_SERVICES gateway"
+
+      if [ -z "$PROD_SERVICES" ]; then
+        echo "⚠️  No services to deploy to production"
+        exit 0
+      fi
+
+      echo "📦 Services to deploy to PRODUCTION: $PROD_SERVICES"
+
+      ssh -o StrictHostKeyChecking=yes ubuntu@j13c101.p.ssafy.io "
+        set -e
+        cd ~ &&
+
+        # 프로덕션 배포 대상 서비스 목록 (GitLab CI에서 전달)
+        PROD_TARGETS=\"$PROD_SERVICES\"
+        echo '🔍 Pre-deployment checks...' &&
+        echo \"📦 Production targets: \$PROD_TARGETS\" &&
+
+        # PROD_TARGETS가 비어있으면 종료
+        if [ -z \"\$PROD_TARGETS\" ]; then
+          echo '⚠️  No services to deploy to production, exiting'
+          exit 0
+        fi &&
+
+        # 현재 실행 중인 서비스 상태 백업
+        docker compose ps --format json > /tmp/pre_deploy_status.json &&
+
+        # 이미지 pull
+        echo '📥 Pulling production images...' &&
+        docker compose pull \$PROD_TARGETS &&
+
+        # 순차적 프로덕션 배포 (더 보수적)
+        SERVICE_ORDER=\"user-service media-service ark-service conversation-service quiz-service ai-service gateway\"
+
+        for service in \$SERVICE_ORDER; do
+          if echo \" \$PROD_TARGETS \" | grep -Fq \" \$service \"; then
+            echo \"🔄 Deploying \$service to production...\" &&
+
+            # 기존 컨테이너 상태 확인
+            OLD_STATUS=\$(docker compose ps \$service --format json 2>/dev/null || echo '{}') &&
+
+            # 프로덕션 서비스별 마이그레이션 실행
+            if [ \"\$service\" = \"user-service\" ]; then
+              echo \"🗄️ Running user-service production migration...\" &&
+              docker compose up -d --no-deps user-service &&
+              sleep 10 &&
+              docker exec --user root user-service npx prisma migrate deploy
+            elif [ \"\$service\" = \"media-service\" ]; then
+              echo \"🗄️ Running media-service production migration...\" &&
+              docker compose up -d --no-deps media-service &&
+              sleep 10 &&
+              docker exec --user root media-service npx prisma migrate deploy
+            elif [ \"\$service\" = \"ark-service\" ]; then
+              echo \"🗄️ Running ark-service production migration...\" &&
+              docker compose up -d --no-deps ark-service &&
+              sleep 10 &&
+              docker exec --user root ark-service npx prisma migrate deploy
+            elif [ \"\$service\" = \"conversation-service\" ]; then
+              echo \"🗄️ Running conversation-service production migration...\" &&
+              docker compose up -d --no-deps conversation-service &&
+              sleep 10 &&
+              docker exec --user root conversation-service npx prisma migrate deploy
+            elif [ \"\$service\" = \"quiz-service\" ]; then
+              echo \"🗄️ Running quiz-service production migration...\" &&
+              docker compose up -d --no-deps quiz-service &&
+              sleep 10 &&
+              docker exec --user root quiz-service npx prisma migrate deploy
+            else
+              # Gateway는 일반 Blue-Green 배포
+              docker compose up -d --no-deps \$service
+            fi &&
+
+            # 더 긴 대기 시간 (프로덕션이므로)
+            echo \"⏳ Waiting for \$service to stabilize...\" &&
+            sleep 20 &&
+
+            # 상태 검증
+            if ! docker compose ps \$service --format json | grep -q '\"State\":\"running\"'; then
+              echo \"❌ ERROR: \$service failed in production! Rolling back...\" &&
+              # 간단한 롤백 시도
+              docker compose restart \$service &&
+              exit 1
+            fi &&
+
+            # 헬스체크 (있다면)
+            if docker compose ps \$service --format json | grep -q '\"Health\"'; then
+              echo \"🏥 Waiting for \$service health check...\" &&
+              for i in \$(seq 1 12); do  # 2분 대기
+                if docker compose ps \$service --format json | grep -q '\"Health\":\"healthy\"'; then
+                  echo \"✅ \$service is healthy\"
+                  break
+                fi
+                sleep 10
+                echo \"⏳ Health check attempt \$i/12...\"
+              done
+            fi &&
+
+            echo \"✅ \$service deployed successfully to production\"
+          fi
+        done &&
+
+        echo '🧹 Cleaning up old images...' &&
+        docker image prune -f &&
+
+        echo '🎉 PRODUCTION deployment completed successfully!'
+      "
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual
+      allow_failure: false
+  resource_group: deployment
+  needs:
+    - job: detect-changes
+      artifacts: true
+  environment:
+    name: production
+    url: https://j13c101.p.ssafy.io
+  tags:
+    - docker

@@ -1,0 +1,49 @@
+generator client {
+  provider      = "prisma-client-js"
+  output        = "../generated/client"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Conversation {
+  id                BigInt    @id @default(autoincrement())
+  childId           BigInt    @map("child_id")
+  title             String?   @map("title")
+  initialImageS3Url String?   @map("initial_image_s3_url")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  endAt             DateTime? @map("end_at")
+
+  questions Question[]
+
+  @@map("conversations")
+}
+
+model Question {
+  id             BigInt   @id @default(autoincrement())
+  conversationId BigInt   @map("conversation_id")
+  questionText   String   @map("question_text")
+  questionOrder  Int      @map("question_order")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  answer       Answer?
+
+  @@index([conversationId, questionOrder])
+  @@map("questions")
+}
+
+model Answer {
+  id              BigInt   @id @default(autoincrement())
+  questionId      BigInt   @unique @map("question_id")
+  answerText      String   @map("answer_text")
+  vqaDirectAnswer String?  @map("vqa_direct_answer")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@map("answers")
+}

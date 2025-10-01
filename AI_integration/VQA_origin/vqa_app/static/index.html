@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VQA 챗봇</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f2f5;
+        }
+        #chat-container {
+            width: 90%;
+            max-width: 600px;
+            height: 80vh;
+            border: 1px solid #ccc;
+            border-radius: 10px;
+            background-color: #fff;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        #chat-box {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 20px;
+            border-bottom: 1px solid #ccc;
+        }
+        #input-form {
+            display: flex;
+            padding: 10px;
+        }
+        #question {
+            flex-grow: 1;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            padding: 10px;
+            margin-right: 10px;
+        }
+        #image-upload {
+            display: none;
+        }
+        #upload-label, #submit-btn {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 5px;
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+            text-align: center;
+        }
+        #upload-label {
+            margin-right: 10px;
+        }
+        #submit-btn {
+            background-color: #28a745;
+        }
+        .message {
+            margin-bottom: 15px;
+            padding: 10px;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+        }
+        .user-message {
+            background-color: #e1ffc7;
+            align-self: flex-end;
+            align-items: flex-end;
+        }
+        .bot-message {
+            background-color: #f1f1f1;
+            align-self: flex-start;
+            align-items: flex-start;
+        }
+        .message img {
+            max-width: 200px;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+        #loading {
+            text-align: center;
+            padding: 10px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="chat-container">
+        <div id="chat-box">
+            <div class="message bot-message">
+                안녕하세요! 이미지를 업로드하고 질문을 입력해주세요.
+            </div>
+        </div>
+        <div id="loading">답변을 생성하는 중...</div>
+        <form id="input-form" enctype="multipart/form-data">
+            <label for="image-upload" id="upload-label">이미지 선택</label>
+            <input type="file" id="image-upload" name="image_file" accept="image/*" required>
+            <select id="tone-select" name="tone" style="padding: 10px; border: 1px solid #ccc; border-radius: 5px; margin-right: 10px;">
+                <option value="기본">기본 말투</option>
+                <option value="친근하게">친근하게</option>
+                <option value="정중하게">정중하게</option>
+                <option value="단호하게">단호하게</option>
+            </select>
+            <input type="text" id="question" name="question" placeholder="질문을 입력하세요..." required>
+            <button type="submit" id="submit-btn">전송</button>
+        </form>
+    </div>
+
+    <script>
+        const form = document.getElementById('input-form');
+        const chatBox = document.getElementById('chat-box');
+        const questionInput = document.getElementById('question');
+        const imageInput = document.getElementById('image-upload');
+        const uploadLabel = document.getElementById('upload-label');
+        const loadingDiv = document.getElementById('loading');
+        const toneSelect = document.getElementById('tone-select');
+
+        imageInput.addEventListener('change', () => {
+            const fileName = imageInput.files.length > 0 ? imageInput.files[0].name : '이미지 선택';
+            uploadLabel.textContent = fileName;
+            uploadLabel.style.backgroundColor = '#28a745';
+        });
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            if (!imageInput.files[0]) {
+                alert('이미지를 선택해주세요.');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('image_file', imageInput.files[0]);
+            formData.append('question', questionInput.value);
+            formData.append('tone', toneSelect.value);
+
+            // Display user message
+            const userMessageDiv = document.createElement('div');
+            userMessageDiv.className = 'message user-message';
+            userMessageDiv.innerHTML = `<strong>질문:</strong> ${questionInput.value}`;
+            const userImage = document.createElement('img');
+            userImage.src = URL.createObjectURL(imageInput.files[0]);
+            userMessageDiv.appendChild(userImage);
+            chatBox.appendChild(userMessageDiv);
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            // Show loading indicator
+            loadingDiv.style.display = 'block';
+            form.style.display = 'none';
+
+            // Clear inputs for next query
+            const currentQuestion = questionInput.value;
+            questionInput.value = '';
+            imageInput.value = '';
+            uploadLabel.textContent = '이미지 선택';
+            uploadLabel.style.backgroundColor = '#007bff';
+            
+            // Await response from bot
+            try {
+                const response = await fetch('/api/vqa', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                
+                // Display bot message
+                const botMessageDiv = document.createElement('div');
+                botMessageDiv.className = 'message bot-message';
+                botMessageDiv.innerHTML = `<strong>답변:</strong><p>${result.answer}</p>`;
+                chatBox.appendChild(botMessageDiv);
+
+            } catch (error) {
+                console.error('Error:', error);
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'message bot-message';
+                errorDiv.innerHTML = `<strong>오류:</strong><p>답변을 가져오는 데 실패했습니다.</p>`;
+                chatBox.appendChild(errorDiv);
+            } finally {
+                // Hide loading indicator
+                loadingDiv.style.display = 'none';
+                form.style.display = 'flex';
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }
+        });
+    </script>
+</body>
+</html>

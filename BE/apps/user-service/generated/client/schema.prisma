@@ -1,0 +1,54 @@
+generator client {
+  provider      = "prisma-client-js"
+  output        = "../generated/client"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  userId       BigInt   @id @default(autoincrement()) @map("user_id")
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  address      String
+  latitude     Float
+  longitude    Float
+  createdAt    DateTime @default(now()) @map("created_at")
+  children     Child[]
+  parents      Parent[]
+
+  @@map("users")
+}
+
+model Parent {
+  parentId      BigInt    @id @default(autoincrement()) @map("parent_id")
+  userId        BigInt    @map("user_id")
+  name          String
+  birthDate     DateTime? @map("birth_date")
+  gender        String?
+  pinHash       String    @map("pin_hash")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  avatarMediaId BigInt?   @map("avatar_media_id")
+  voiceMediaId  String?   @map("voice_media_id")
+  user          User      @relation(fields: [userId], references: [userId])
+
+  @@index([userId])
+  @@map("parents")
+}
+
+model Child {
+  childId       BigInt    @id @default(autoincrement()) @map("child_id")
+  userId        BigInt    @map("user_id")
+  name          String
+  birthDate     DateTime? @map("birth_date")
+  gender        String?
+  createdAt     DateTime  @default(now()) @map("created_at")
+  avatarMediaId BigInt?   @map("avatar_media_id")
+  user          User      @relation(fields: [userId], references: [userId])
+
+  @@index([userId])
+  @@map("children")
+}

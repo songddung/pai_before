@@ -1,0 +1,32 @@
+# -----------------------
+# 기본적으로 무시해야 할 것들
+# -----------------------
+node_modules
+**/node_modules
+BE/node_modules
+BE/**/node_modules
+dist
+.git
+.gitignore
+Dockerfile
+docker-compose.yml
+npm-debug.log
+yarn-error.log
+.env
+.env.*    # 환경변수 파일들
+
+# -----------------------
+# Nx/NestJS 빌드 관련
+# -----------------------
+apps/*/dist
+apps/*/node_modules
+libs/*/dist
+libs/*/node_modules
+
+# -----------------------
+# IDE / OS 별 불필요한 파일
+# -----------------------
+.vscode
+.idea
+.DS_Store
+Thumbs.db

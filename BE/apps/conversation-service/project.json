@@ -1,0 +1,25 @@
+{
+  "name": "conversation-service",
+  "root": "BE/apps/conversation-service",
+  "sourceRoot": "BE/apps/conversation-service/src",
+  "projectType": "application",
+  "targets": {
+    "build": {
+      "executor": "@nx/js:tsc",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/BE/apps/conversation-service",
+        "main": "BE/apps/conversation-service/src/main.ts",
+        "tsConfig": "BE/apps/conversation-service/tsconfig.app.json",
+        "generatePackageJson": true,
+        "assets": []
+      }
+    },
+    "serve": {
+      "executor": "@nx/js:node",
+      "options": {
+        "buildTarget": "conversation-service:build"
+      }
+    }
+  }
+}

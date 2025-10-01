@@ -1,0 +1,42 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compileOnSave": false,
+  "files": [],
+  "references": [
+    {
+      "path": "./apps/BE-e2e"
+    },
+    {
+      "path": "./apps/BE"
+    }
+  ],
+  "compilerOptions": {
+    "baseUrl": "./",
+    "paths": {
+      "@app/shared-types": [
+        "libs/shared-types/src/index.ts"
+      ],
+      "@app/shared-types/*": [
+        "libs/shared-types/src/*"
+      ],
+      ":wq/dto": [
+        "libs/dto/src"
+      ],
+      ":wq/dto/*": [
+        "libs/dto/src/*"
+      ],
+      "@app/common": [
+        "libs/common/src"
+      ],
+      "@app/common/*": [
+        "libs/common/src/*"
+      ],
+      "ls/utils": [
+        "libs/utils/src"
+      ],
+      "ls/utils/*": [
+        "libs/utils/src/*"
+      ]
+    }
+  }
+}

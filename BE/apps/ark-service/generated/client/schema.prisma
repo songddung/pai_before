@@ -1,0 +1,67 @@
+generator client {
+  provider      = "prisma-client-js"
+  output        = "../generated/client"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Analytics {
+  analyticsId       BigInt    @id @default(autoincrement()) @map("analytics_id")
+  conversationId    BigInt?   @map("conversation_id")
+  childId           BigInt    @map("child_id")
+  extractedKeywords Json?     @map("extracted_keywords")
+  analysisDate      DateTime? @map("analysis_date")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  category          String    @map("category")
+
+  @@index([childId])
+  @@index([conversationId])
+  @@index([childId, category])
+  @@map("analytics")
+}
+
+model ChildInterest {
+  interestId   BigInt   @id @default(autoincrement()) @map("interest_id")
+  childId      BigInt   @map("child_id")
+  category     String   @map("category")
+  mentionCount Int      @map("mention_count")
+  lastUpdated  DateTime @default(now()) @map("last_updated")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@unique([childId, category])
+  @@index([childId, category])
+  @@map("child_interests")
+}
+
+model Recommendation {
+  recommendationId   BigInt   @id @default(autoincrement()) @map("recommendation_id")
+  childId            BigInt   @map("child_id")
+  recommendationType String   @map("recommendation_type")
+  title              String   @map("title")
+  description        String?  @map("description")
+  recommendationData Json?    @map("recommendation_data")
+  isActive           Boolean  @default(true) @map("is_active")
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  @@index([childId, isActive])
+  @@map("recommendations")
+}
+
+model ParentReport {
+  reportId        BigInt    @id @default(autoincrement()) @map("report_id")
+  parentId        BigInt    @map("parent_id")
+  childId         BigInt    @map("child_id")
+  reportType      String    @map("report_type")
+  reportStartDate DateTime? @map("report_start_date")
+  reportEndDate   DateTime? @map("report_end_date")
+  bubbleChartData Json?     @map("bubble_chart_data")
+  generatedAt     DateTime  @default(now()) @map("generated_at")
+
+  @@index([parentId])
+  @@index([childId])
+  @@map("parent_reports")
+}

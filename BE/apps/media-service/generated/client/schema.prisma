@@ -1,0 +1,29 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UploaderType {
+  PARENT
+  CHILD
+}
+
+model MediaFile {
+  mediaId           BigInt       @id @default(autoincrement()) @map("media_id")
+  uploaderProfileId BigInt       @map("uploader_profile_id")
+  uploaderType      UploaderType @map("uploader_type")
+  fileName          String       @map("file_name")
+  mimeType          String       @map("mime_type")
+  fileSize          BigInt       @map("file_size")
+  s3Key             String       @map("s3_key")
+  cdnUrl            String?      @map("cdn_url")
+  createdAt         DateTime     @default(now()) @map("created_at")
+
+  @@index([uploaderProfileId, uploaderType])
+  @@map("media_files")
+}
