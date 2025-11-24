@@ -14,7 +14,6 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../../../domains/user/hooks/useAuth";
-import { quizApi } from "../../../domains/quiz/api/quizApi";
 
 type Answer = {
   id: string;
@@ -48,32 +47,102 @@ export default function QuizDetailPage() {
       }
 
       setLoading(true);
+      // 퀴즈가 바뀔 때마다 답변 초기화
+      setAnswers([]);
+      setInput('');
+      setCompleted(false);
+
       try {
-        console.log('퀴즈 상세 조회 시작, ID:', id);
+        // 목데이터
+        const today = new Date();
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
 
-        // 오늘의 퀴즈 목록에서 해당 ID의 퀴즈 찾기
-        const availableQuizzes = await quizApi.getAvailableQuizzes();
-        console.log('오늘의 퀴즈 목록:', availableQuizzes);
+        const mockQuizzes = [
+          {
+            id: '1',
+            question: '아빠가 가장 좋아하는 음식은 무엇일까요?',
+            answer: '김치찌개',
+            reward: '용돈 1000원',
+            quizDate: today.toISOString().split('T')[0],
+            myResult: null,
+            exampleAnswers: [
+              { text: '돈까스', similarity: 20 },
+              { text: '피자', similarity: 15 },
+              { text: '찌개', similarity: 50 },
+              { text: '김치', similarity: 50 },
+              { text: '된장찌개', similarity: 40 },
+              { text: '김치찌개', similarity: 100 },
+            ],
+          },
+          {
+            id: '2',
+            question: '엄마의 취미는 무엇일까요?',
+            answer: '독서',
+            reward: '간식 쿠폰',
+            quizDate: today.toISOString().split('T')[0],
+            myResult: {
+              isSolved: false,
+              totalAttempts: 2,
+            },
+            exampleAnswers: [
+              { text: '뜨개질', similarity: 25 },
+              { text: '요리', similarity: 20 },
+              { text: '운동', similarity: 15 },
+              { text: '책', similarity: 50 },
+              { text: '책 읽기', similarity: 80 },
+              { text: '독서', similarity: 100 },
+            ],
+          },
+          {
+            id: '3',
+            question: '아빠가 다니는 회사 이름은?',
+            answer: '삼성',
+            reward: '게임 시간 30분',
+            quizDate: yesterday.toISOString().split('T')[0],
+            myResult: {
+              isSolved: true,
+              totalAttempts: 1,
+              score: 100,
+            },
+            exampleAnswers: [
+              { text: '삼성전자', similarity: 80 },
+              { text: '삼성', similarity: 100 },
+            ],
+          },
+        ];
 
-        const targetQuiz = availableQuizzes.find((q: any) => q.id === id);
+        const targetQuiz = mockQuizzes.find((q: any) => q.id === id);
 
         if (targetQuiz) {
           setQuiz(targetQuiz);
-          console.log('선택된 퀴즈:', targetQuiz);
 
-          // 이미 해결된 퀴즈인지 확인
           if (targetQuiz.myResult?.isSolved) {
             setCompleted(true);
-            console.log('이미 해결된 퀴즈입니다.');
+            // 완료된 퀴즈는 이전 제출 답변을 표시
+            if (targetQuiz.id === '3') {
+              setAnswers([
+                {
+                  id: '1',
+                  text: '삼성전자',
+                  similarity: 80,
+                  correct: false,
+                },
+                {
+                  id: '2',
+                  text: '삼성',
+                  similarity: 100,
+                  correct: true,
+                },
+              ]);
+            }
           }
         } else {
-          console.error('퀴즈를 찾을 수 없음, ID:', id);
           Alert.alert('오류', '퀴즈를 찾을 수 없습니다.', [
             { text: '확인', onPress: () => router.back() }
           ]);
         }
       } catch (error: any) {
-        console.error('퀴즈 상세 조회 실패:', error);
         Alert.alert('오류', '퀴즈를 불러올 수 없습니다.', [
           { text: '확인', onPress: () => router.back() }
         ]);
@@ -112,37 +181,39 @@ export default function QuizDetailPage() {
     if (!input.trim()) return;
 
     const userAnswer = input.trim();
-    console.log('사용자 답변 제출:', userAnswer);
 
     try {
-      console.log('퀴즈 제출 API 호출');
-      console.log('제출 데이터:', {
-        quizId: quiz.id,
-        userAnswer: userAnswer
-      });
+      // 목데이터 - 정답 검증
+      const correctAnswer = quiz.answer || '';
+      const currentAttempts = answers.length + 1;
 
-      // 백엔드 퀴즈 제출 API 호출 - 정답 검증은 백엔드에서 처리
-      const result = await quizApi.submitQuiz(quiz.id, {
-        answer: userAnswer // 백엔드 DTO에 맞게 단일 문자열로 전송
-      });
+      // 예시 답변 기반 유사도 계산
+      let similarity = 0;
+      let isCorrect = false;
 
-      console.log('퀴즈 제출 결과 원본:', result);
-      console.log('퀴즈 제출 결과 타입:', typeof result);
-      console.log('퀴즈 제출 결과 키들:', Object.keys(result || {}));
+      // 1. 예시 답변에서 정확히 일치하는 답변이 있는지 확인
+      const exampleAnswers = quiz.exampleAnswers || [];
+      const matchedExample = exampleAnswers.find((ex: any) =>
+        ex.text.toLowerCase() === userAnswer.toLowerCase()
+      );
 
-      // 백엔드에서 검증된 결과 사용 (QuizSubmitResponse 구조에 맞게)
-      const isCorrect = result.isSolved || false;
-      const similarity = result.similarity || 0;
-      const totalAttempts = result.totalAttempts || 1;
-      const message = result.message || '';
+      if (matchedExample) {
+        // 예시 답변과 일치하면 미리 정의된 유사도 사용
+        similarity = matchedExample.similarity;
+        isCorrect = similarity === 100;
+      } else {
+        // 예시에 없는 답변은 기본 로직 사용
+        isCorrect = userAnswer.toLowerCase().includes(correctAnswer.toLowerCase()) ||
+                   correctAnswer.toLowerCase().includes(userAnswer.toLowerCase());
 
-      console.log('파싱된 결과:', {
-        isCorrect,
-        similarity,
-        totalAttempts,
-        message,
-        rawResult: result
-      });
+        if (isCorrect) {
+          similarity = 100;
+        } else {
+          // 부분 일치도 계산
+          const commonChars = userAnswer.split('').filter(char => correctAnswer.includes(char)).length;
+          similarity = Math.floor((commonChars / correctAnswer.length) * 100);
+        }
+      }
 
       const newAnswer: Answer = {
         id: Date.now().toString(),
@@ -156,30 +227,17 @@ export default function QuizDetailPage() {
 
       if (isCorrect) {
         setCompleted(true);
-        Alert.alert('정답!', `축하합니다!\n유사도: ${similarity}%\n시도 횟수: ${totalAttempts}번\n보상: ${quiz.reward || '없음'}`, [
+        Alert.alert('정답!', `축하합니다!\n정답: ${correctAnswer}\n유사도: ${similarity}%\n시도 횟수: ${currentAttempts}번\n보상: ${quiz.reward || '없음'}`, [
           { text: '확인' }
         ]);
       } else {
-        Alert.alert('오답', `아쉬워요!\n유사도: ${similarity}%\n시도 횟수: ${totalAttempts}번\n${message || '다시 생각해보세요!'}`, [
+        Alert.alert('오답', `아쉬워요!\n유사도: ${similarity}%\n시도 횟수: ${currentAttempts}번\n다시 생각해보세요!`, [
           { text: '확인' }
         ]);
       }
 
     } catch (error: any) {
-      console.error('퀴즈 제출 실패:', error);
-      console.error('에러 상세:', {
-        status: error.response?.status,
-        data: error.response?.data,
-        message: error.message
-      });
-
-      if (error.response?.status === 409 && error.response?.data?.message === 'QUIZ_ALREADY_SOLVED') {
-        Alert.alert('알림', '이미 정답을 맞춘 퀴즈입니다!', [
-          { text: '확인', onPress: () => router.back() }
-        ]);
-      } else {
-        Alert.alert('오류', `답변 제출에 실패했습니다.\n${error.response?.data?.message || error.message}`);
-      }
+      Alert.alert('오류', '답변 제출에 실패했습니다.');
     }
   };
 
@@ -192,7 +250,7 @@ export default function QuizDetailPage() {
       >
         {/* 헤더 */}
         <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={{ padding: 5 }}>
+        <TouchableOpacity onPress={() => router.push('/(child)/quiz')} style={{ padding: 5 }}>
           <Ionicons name="chevron-back" size={28} color="#333" />
         </TouchableOpacity>
         <Text style={styles.title}>퀴즈 #{quiz.id}</Text>
@@ -211,7 +269,7 @@ export default function QuizDetailPage() {
       <FlatList
         data={answers}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={{ paddingBottom: 100 }}
+        contentContainerStyle={{ paddingBottom: 20 }}
         renderItem={({ item }) => (
           <View
             style={[

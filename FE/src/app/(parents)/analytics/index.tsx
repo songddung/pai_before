@@ -113,13 +113,13 @@ export default function AnalyticsChildList() {
           </View>
         )}
         renderItem={({ item, index }) => {
-          // 프로필별로 순환하여 piggy 이미지 할당 (piggy1, piggy2, piggy3)
-          const piggyImages = [
-            require('../../../../assets/images/piggy1.jpg'),
-            require('../../../../assets/images/piggy2.jpg'),
-            require('../../../../assets/images/piggy3.jpg'),
-          ];
-          const piggyImage = piggyImages[index % 3];
+          // avatar_media_id를 기반으로 piggy 이미지 매칭
+          const piggyImages: { [key: string]: any } = {
+            piggy1: require('../../../../assets/images/piggy1.jpg'),
+            piggy2: require('../../../../assets/images/piggy2.jpg'),
+            piggy3: require('../../../../assets/images/piggy3.jpg'),
+          };
+          const piggyImage = piggyImages[item.avatar_media_id] || require('../../../../assets/images/piggy1.jpg');
 
           return (
             <TouchableOpacity

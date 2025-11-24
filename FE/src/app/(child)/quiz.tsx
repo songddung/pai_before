@@ -12,10 +12,6 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../../domains/user/hooks/useAuth";
-import { quizApi } from "../../domains/quiz/api/quizApi";
-import { tokenStorage } from "../../shared/api/client";
-import { tokenUtils } from "../../shared/utils/token";
-import { profileApi } from "../../domains/user/api/userApi";
 
 
 export default function QuizPage() {
@@ -30,173 +26,66 @@ export default function QuizPage() {
   });
 
   const fetchAvailableQuizzes = useCallback(async () => {
-    console.log('퀴즈 페이지 초기화 - 인증 상태 확인:', {
-      isAuthenticated,
-      hasAccessToken: !!accessToken,
-      accessTokenLength: accessToken?.length,
-    });
-
     if (!isAuthenticated || !accessToken) {
-      console.log('인증 실패 - 로그인 페이지로 이동');
       router.replace('/login');
       return;
     }
 
     setLoading(true);
     try {
-      console.log('아이용 오늘의 퀴즈 조회 시작');
+      // 목데이터 - 3개의 퀴즈 샘플
+      const today = new Date();
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
 
-      // 현재 토큰에서 프로필 정보 확인
-      const currentToken = await tokenStorage.getAccessToken();
-      let currentChildId = null;
-      let currentUserId = null;
+      const mockQuizzes = [
+        {
+          id: '1',
+          question: '아빠가 가장 좋아하는 음식은 무엇일까요?',
+          reward: '용돈 1000원',
+          quizDate: today.toISOString().split('T')[0],
+          parentId: '1',
+          myResult: null, // 새로운 퀴즈
+        },
+        {
+          id: '2',
+          question: '엄마의 취미는 무엇일까요?',
+          reward: '간식 쿠폰',
+          quizDate: today.toISOString().split('T')[0],
+          parentId: '1',
+          myResult: {
+            isSolved: false,
+            totalAttempts: 2,
+          }, // 진행중
+        },
+        {
+          id: '3',
+          question: '아빠가 다니는 회사 이름은?',
+          reward: '게임 시간 30분',
+          quizDate: yesterday.toISOString().split('T')[0],
+          parentId: '1',
+          myResult: {
+            isSolved: true,
+            totalAttempts: 1,
+            score: 100,
+          }, // 완료
+        },
+      ];
 
-      if (currentToken) {
-        const tokenData = tokenUtils.decodeToken(currentToken);
-        currentChildId = tokenData?.profile_id;
-        currentUserId = tokenData?.sub; // JWT의 sub는 user_id
+      setQuizzes(mockQuizzes);
 
-        console.log('퀴즈 조회 시 토큰 정보:', {
-          hasToken: !!currentToken,
-          tokenLength: currentToken.length,
-          profile_id: tokenData?.profile_id,
-          profile_name: tokenData?.profile_name,
-          profile_type: tokenData?.profile_type,
-          user_id: tokenData?.sub,
-          exp: tokenData?.exp,
-          현재시간: new Date().getTime() / 1000,
-          만료여부: tokenData?.exp ? (tokenData.exp < (new Date().getTime() / 1000) ? '만료됨' : '유효함') : '확인불가',
-        });
-      } else {
-        console.error('퀴즈 조회 시 토큰 없음');
-      }
+      const completed = mockQuizzes.filter((q: any) => q.myResult?.isSolved).length;
+      const inProgress = mockQuizzes.filter((q: any) => q.myResult && !q.myResult.isSolved).length;
+      const newQuizzes = mockQuizzes.filter((q: any) => !q.myResult).length;
 
-      // 실제 API 호출 - 백엔드에서 JWT 토큰 기반으로 가족 퀴즈만 필터링하여 반환
-      const availableQuizzes = await quizApi.getAvailableQuizzes();
-      console.log('오늘의 퀴즈 API 응답:', {
-        data: availableQuizzes,
-        dataType: typeof availableQuizzes,
-        isArray: Array.isArray(availableQuizzes),
-        length: availableQuizzes?.length,
+      setSummary({
+        completed,
+        inProgress,
+        new: newQuizzes,
       });
-
-      // 백엔드에서 오늘 날짜의 모든 퀴즈를 받고, 프론트에서 user_id로 필터링
-      console.log('=== 퀴즈 데이터 구조 분석 ===');
-      console.log('현재 로그인 user_id:', currentUserId);
-      console.log('받은 전체 퀴즈 개수:', availableQuizzes?.length || 0);
-
-      // 첫 번째 퀴즈 데이터 구조 분석
-      if (availableQuizzes && availableQuizzes.length > 0) {
-        console.log('첫 번째 퀴즈 데이터 구조:');
-        console.log('전체 필드:', Object.keys(availableQuizzes[0]));
-        console.log('전체 데이터:', availableQuizzes[0]);
-      }
-
-      // 현재 user의 부모 프로필들 조회
-      console.log('\n=== 부모 프로필 조회 ===');
-      let parentProfileIds: string[] = [];
-      try {
-        const allProfiles = await profileApi.getAllProfiles();
-        const familyParentProfiles = allProfiles.filter((profile: any) =>
-          profile.user_id === currentUserId && profile.profile_type === 'PARENT'
-        );
-        parentProfileIds = familyParentProfiles.map((p: any) => p.profile_id.toString());
-
-        console.log('현재 user의 부모 프로필 IDs:', parentProfileIds);
-        console.log('부모 프로필 상세:', familyParentProfiles);
-      } catch (error) {
-        console.error('부모 프로필 조회 실패:', error);
-      }
-
-      // parentId 기반 필터링
-      let filteredQuizzes = [];
-      if (availableQuizzes && Array.isArray(availableQuizzes) && parentProfileIds.length > 0) {
-        console.log('\n=== parentId 기반 필터링 시작 ===');
-
-        filteredQuizzes = availableQuizzes.filter((quiz: any) => {
-          // 퀴즈의 parentId가 현재 user의 부모 프로필 중 하나인지 확인
-          const quizParentId = quiz.parentId || quiz.parent_id;
-          const isMatch = quizParentId && parentProfileIds.includes(quizParentId.toString());
-
-          console.log(`퀴즈 ${quiz.id}:`, {
-            quizParentId,
-            parentProfileIds,
-            isMatch,
-            question: quiz.question?.substring(0, 30) + '...'
-          });
-
-          return isMatch;
-        });
-
-        console.log(`필터링 결과: ${availableQuizzes.length} -> ${filteredQuizzes.length}`);
-      } else {
-        console.log('필터링 조건 미충족 - 빈 배열 반환');
-        console.log('조건:', {
-          hasQuizzes: !!availableQuizzes,
-          isArray: Array.isArray(availableQuizzes),
-          hasParentProfiles: parentProfileIds.length > 0
-        });
-        filteredQuizzes = [];
-      }
-
-      // 응답 데이터 상세 로깅
-      if (filteredQuizzes && Array.isArray(filteredQuizzes)) {
-        filteredQuizzes.forEach((quiz, index) => {
-          console.log(`필터링된 퀴즈 ${index + 1}:`, {
-            id: quiz.id,
-            question: quiz.question,
-            reward: quiz.reward,
-            quizDate: quiz.quizDate,
-            createdBy: quiz.createdBy || quiz.created_by || quiz.profile_id,
-            myResult: quiz.myResult,
-            hasMyResult: !!quiz.myResult,
-            isSolved: quiz.myResult?.isSolved,
-          });
-        });
-      }
-
-      if (filteredQuizzes && filteredQuizzes.length > 0) {
-        setQuizzes(filteredQuizzes);
-
-        // 퀴즈 상태별 집계 (실제 API 데이터 구조 기준)
-        const completed = filteredQuizzes.filter((q: any) => q.myResult?.isSolved).length;
-        const inProgress = filteredQuizzes.filter((q: any) => q.myResult && !q.myResult.isSolved).length;
-        const newQuizzes = filteredQuizzes.filter((q: any) => !q.myResult).length;
-
-        setSummary({
-          completed,
-          inProgress,
-          new: newQuizzes,
-        });
-
-        console.log('퀴즈 상태별 집계:', {
-          total: filteredQuizzes.length,
-          completed,
-          inProgress,
-          new: newQuizzes
-        });
-      } else {
-        console.log('가족 부모의 퀴즈가 없음');
-        setQuizzes([]);
-        setSummary({ completed: 0, inProgress: 0, new: 0 });
-      }
     } catch (err: any) {
-      console.error('퀴즈 조회 실패:', {
-        error: err.message,
-        status: err.response?.status,
-        data: err.response?.data,
-        url: err.config?.url,
-        method: err.config?.method,
-      });
-
-      if (err.response?.status === 401) {
-        console.log('인증 오류로 로그인 페이지로 이동');
-        router.replace('/login');
-      } else {
-        console.error('퀴즈 API 호출 실패 - 서버 오류:', err.response?.data?.message || err.message);
-        setQuizzes([]);
-        setSummary({ completed: 0, inProgress: 0, new: 0 });
-      }
+      setQuizzes([]);
+      setSummary({ completed: 0, inProgress: 0, new: 0 });
     } finally {
       setLoading(false);
     }
@@ -210,7 +99,6 @@ export default function QuizPage() {
   // 페이지 포커스 시 새로고침
   useFocusEffect(
     useCallback(() => {
-      console.log('퀴즈 페이지 포커스 - 데이터 새로고침');
       fetchAvailableQuizzes();
     }, [fetchAvailableQuizzes])
   );
@@ -219,7 +107,7 @@ export default function QuizPage() {
     // API 데이터에서 상태 계산
     let status = '새로운';
     let statusColor = '#16a34a';
-    let icon = <Ionicons name="play-circle" size={20} color="#a855f7" />;
+    let icon = <Ionicons name="play-circle" size={20} color="#fff" />;
 
     if (item.myResult) {
       if (item.myResult.isSolved) {

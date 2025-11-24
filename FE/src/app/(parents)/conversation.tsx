@@ -345,17 +345,10 @@ export default function ParentConversationPage() {
     ]);
   };
 
-  // VQA API를 사용한 질문 전송
+  // 목데이터를 사용한 질문 전송
   const sendMessage = async (messageText?: string) => {
     const text = messageText || input.trim();
     if (!text) return;
-
-    // 이미지가 필요한 경우 먼저 업로드
-    const imageS3Url = await uploadImageToS3IfNeeded();
-    if (selectedImage && !imageS3Url) {
-      Alert.alert('오류', '이미지 업로드가 필요합니다.');
-      return;
-    }
 
     // 사용자 메시지 추가
     const userMessage: TextMessage = {
@@ -367,58 +360,44 @@ export default function ParentConversationPage() {
     setInput('');
     setIsLoading(true);
 
-    try {
-      // VQA API 직접 호출
-      const response = await aiApi.sendMessage({
-        imageS3Url: imageS3Url || undefined,
-        question: text,
-        childName: selectedProfile?.name || '아이',
-      });
+    // 목데이터 응답 생성
+    setTimeout(() => {
+      let mockResponse = '';
 
-      // 첫 번째 질문이면 카테고리를 title로 설정
-      if (questions.length === 0 && response.vqaDirectAnswer) {
-        const category = response.vqaDirectAnswer;
-        const categoryTitle = getCategoryTitle(category);
-        setConversationTitle(categoryTitle);
-        console.log('부모용 - 대화 카테고리 설정:', categoryTitle);
+      // "이게 뭐야" 질문에 대한 목데이터 답변
+      if (text.includes('이게 뭐야') || text.includes('뭐야') || text.includes('무엇') || text.includes('뭔가')) {
+        mockResponse = '이건 귀여운 돼지예요! 지금 트램펄린이라는 재미있는 놀이기구 위에서 신나게 점프를 하고 있어요. 트램펄린은 탄력이 있는 천으로 만들어져서 폴짝폴짝 높이 뛸 수 있답니다. 돼지가 정말 즐거워 보이죠?';
+      } else {
+        // 기타 질문에 대한 일반 답변
+        mockResponse = '좋은 질문이에요! 사진을 보니 정말 재미있는 것 같아요. 더 궁금한 게 있으면 물어봐 주세요!';
       }
 
       // AI 응답 추가
       const aiMessage: TextMessage = {
         id: Date.now().toString() + '_pai',
         sender: 'pai',
-        text: response.text,
+        text: mockResponse,
       };
       setMessages((prev) => [...prev, aiMessage]);
 
       // 대화 데이터에 질문-답변 추가
       const questionData: ConversationQuestion = {
         questionText: text,
-        answerText: response.text,
-        vqaDirectAnswer: response.vqaDirectAnswer,
+        answerText: mockResponse,
+        vqaDirectAnswer: undefined,
         questionOrder: questions.length + 1,
         createdAt: new Date().toISOString(),
         answer: {
-          answerText: response.text,
-          vqaDirectAnswer: response.vqaDirectAnswer,
+          answerText: mockResponse,
+          vqaDirectAnswer: undefined,
           createdAt: new Date().toISOString(),
         },
       };
 
       setQuestions((prev) => [...prev, questionData]);
-      console.log('질문-답변 저장됨:', questionData);
-    } catch (error) {
-      console.error('VQA API 호출 실패:', error);
-      // 오류 시 임시 응답
-      const errorMessage: TextMessage = {
-        id: Date.now().toString() + '_pai',
-        sender: 'pai',
-        text: '죄송해요, 지금 응답할 수 없어요. 잠시 후 다시 시도해주세요.',
-      };
-      setMessages((prev) => [...prev, errorMessage]);
-    } finally {
+      console.log('목데이터 질문-답변 저장됨:', questionData);
       setIsLoading(false);
-    }
+    }, 1000); // 1초 지연으로 실제 API 호출처럼 보이게
 
     setStep(3);
   };
@@ -687,8 +666,8 @@ export default function ParentConversationPage() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff', padding: 16 },
-  header: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-  headerTitle: { fontSize: 18, fontWeight: 'bold', marginLeft: 10 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  headerTitle: { fontSize: 18, fontWeight: 'bold', marginLeft: 10, flex: 1 },
   center: { alignItems: 'center', marginBottom: 20 },
   mascot: { width: 80, height: 80, marginBottom: 8 },
   title: { fontSize: 20, fontWeight: 'bold', marginBottom: 6 },
@@ -799,13 +778,15 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     backgroundColor: '#f1f5f9',
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    paddingRight: 20,
+    maxWidth: '85%',
   },
-  mascotSmall: { width: 24, height: 24, marginRight: 6 },
-  messageText: { color: '#111' },
+  mascotSmall: { width: 24, height: 24, marginRight: 6, marginTop: 2 },
+  messageText: { color: '#111', },
   chatImage: {
     width: 200,
-    height: 200,
+    height: 300,
     borderRadius: 12,
   },
   chatInputRow: {

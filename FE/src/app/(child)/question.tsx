@@ -76,13 +76,7 @@ export default function QuestionPage() {
 
   // 프로필 정보 디버깅
   useEffect(() => {
-    console.log('Question 페이지 - 프로필 상태 변경:', {
-      selectedProfile,
-      profileId: selectedProfile?.profile_id,
-      profileName: selectedProfile?.name,
-      profileType: selectedProfile?.profile_type,
-      hasVoiceMediaId: !!selectedProfile?.voice_media_id,
-    });
+
   }, [selectedProfile]);
 
   // 토큰 정보 디버깅
@@ -91,15 +85,8 @@ export default function QuestionPage() {
       const currentToken = await tokenStorage.getAccessToken();
       if (currentToken) {
         const tokenData = tokenUtils.decodeToken(currentToken);
-        console.log('Question 페이지 - 현재 토큰 정보:', {
-          hasToken: !!currentToken,
-          tokenLength: currentToken?.length,
-          profile_id: tokenData?.profile_id,
-          profile_name: tokenData?.profile_name,
-          profile_type: tokenData?.profile_type,
-        });
+
       } else {
-        console.log('Question 페이지 - 토큰 없음');
       }
     };
     checkTokenInfo();
@@ -143,7 +130,6 @@ export default function QuestionPage() {
     try {
       return await tokenStorage.getAccessToken();
     } catch (error) {
-      console.error('토큰 가져오기 실패:', error);
       return accessToken;
     }
   };
@@ -160,34 +146,12 @@ export default function QuestionPage() {
     setQuestions([]);
     setConversationTitle('');
     setIsLoading(false);
-    console.log('자녀용 - 대화 상태 초기화 완료');
   };
 
-  // 이미지 S3 업로드 (처음 한 번만)
+  // 이미지 S3 업로드 제거 - 목데이터 사용
   const uploadImageToS3IfNeeded = async () => {
-    if (selectedImageS3Url || !selectedImage) {
-      return selectedImageS3Url;
-    }
-
-    try {
-      console.log('자녀용 - 이미지 S3 업로드 시작:', selectedImage);
-      setIsLoading(true);
-
-      const latestToken = await getLatestToken();
-      const uploadResult = await mediaApi.uploadImageToS3(
-        selectedImage,
-        latestToken || undefined,
-      );
-      setSelectedImageS3Url(uploadResult.s3_url);
-      console.log('자녀용 - 이미지 S3 업로드 완료:', uploadResult.s3_url);
-      return uploadResult.s3_url;
-    } catch (uploadError) {
-      console.error('자녀용 - 이미지 S3 업로드 실패:', uploadError);
-      Alert.alert('오류', '이미지 업로드에 실패했습니다.');
-      return null;
-    } finally {
-      setIsLoading(false);
-    }
+    // 이미지 업로드 없이 로컬 이미지 URL만 반환
+    return selectedImage;
   };
 
   // 대화 종료 및 저장 (자녀는 항상 DB에 저장)
@@ -207,12 +171,7 @@ export default function QuestionPage() {
             setIsLoading(true);
             const latestToken = await getLatestToken();
             const tokenData = tokenUtils.decodeToken(latestToken!);
-            console.log('자녀 프로필 - 대화 저장 시작', {
-              profileType: tokenData?.profile_type,
-              profileId: tokenData?.profile_id,
-              questionsCount: questions.length,
-              questions: questions
-            });
+     
 
             // 1. 대화 시작
             const startResult = await conversationApi.startConversation({
@@ -221,13 +180,10 @@ export default function QuestionPage() {
               questions: questions,
             });
 
-            console.log('자녀용 - 대화 시작 성공:', startResult);
 
             // 2. 대화 종료 (자동으로 DB 저장)
             const endResult = await conversationApi.endConversation(startResult.conversationId);
 
-            console.log('자녀용 - 대화 종료 결과:', endResult);
-            console.log('자녀용 - 대화 저장 완료');
             Alert.alert('완료', '대화가 저장되었어요! 새로운 대화를 시작할게요.', [
               {
                 text: '확인',
@@ -237,7 +193,6 @@ export default function QuestionPage() {
               },
             ]);
           } catch (error) {
-            console.error('자녀용 - 대화 처리 실패:', error);
             Alert.alert('오류', '대화 저장에 실패했어요.');
           } finally {
             setIsLoading(false);
@@ -281,7 +236,6 @@ export default function QuestionPage() {
 
   // 음성 인식 결과 처리
   const handleSpeechResult = (text: string) => {
-    console.log('자녀용 - 음성 인식 결과:', text);
     sendMessage(text);
     setStep(3);
   };
@@ -296,132 +250,92 @@ export default function QuestionPage() {
 
     try {
       setPlayingAudio(messageId);
-      console.log('TTS 변환 시작:', { messageId, text });
 
-      // AI 서비스 직접 TTS 호출
+      const loginResponse = await fetch('http://darami.life:3001/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: 'yjstar2@naver.com',
+          password: 'yujin0703'
+        }),
+      });
 
-      // 최신 토큰에서 사용자 정보 추출
-      const latestToken = await getLatestToken();
-      const tokenData = tokenUtils.decodeToken(latestToken!);
-      const accountId = tokenData?.sub || user?.userId || '1';
+      const loginText = await loginResponse.text();
+      const loginData = JSON.parse(loginText);
+      const loginToken = loginData.data.accessToken;
 
-      // voice_media_id 가져오기
-      console.log('현재 선택된 프로필 전체:', selectedProfile);
-      console.log('현재 선택된 프로필 voice_media_id:', selectedProfile?.voice_media_id);
-      console.log('현재 선택된 프로필 타입:', selectedProfile?.profile_type);
+      const profileResponse = await fetch('http://darami.life:3001/api/profiles/select', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${loginToken}`,
+        },
+        body: JSON.stringify({
+          profileId: '2',
+        }),
+      });
 
-      let profileId = selectedProfile?.voice_media_id;
+      const profileText = await profileResponse.text();
+      const profileData = JSON.parse(profileText);
+      const profileToken = profileData.data.accessToken;
 
-      // voice_media_id가 없는 경우 (아이 프로필이거나 부모 프로필인데 voice_media_id가 없는 경우), 부모 프로필에서 찾기
-      if (!profileId) {
-        console.log('현재 프로필에 voice_media_id가 없음. 부모 프로필 조회 시작');
+      const response = await fetch('http://darami.life:3001/api/profiles/4/voice/synthesize', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${profileToken}`,
+        },
+        body: JSON.stringify({
+          text: text,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`TTS API 오류: ${response.status} - ${errorText}`);
+      }
+
+      const audioBlob = await response.blob();
+      const reader = new FileReader();
+      reader.readAsDataURL(audioBlob);
+
+      reader.onloadend = async () => {
+        const base64Audio = reader.result as string;
+
+        setMessages(prev => prev.map(msg =>
+          msg.id === messageId && 'text' in msg
+            ? { ...msg, audioUrl: base64Audio }
+            : msg
+        ));
+
         try {
-          const allProfiles = await profileApi.getAllProfiles();
-          console.log('조회된 모든 프로필:', allProfiles);
-          console.log('조회된 프로필 개수:', allProfiles.length);
+          const { sound } = await Audio.Sound.createAsync(
+            { uri: base64Audio },
+            { shouldPlay: true }
+          );
 
-          // 각 프로필의 상세 정보 로그
-          allProfiles.forEach((profile, index) => {
-            console.log(`프로필 ${index + 1}:`, {
-              profile_id: profile.profile_id,
-              name: profile.name,
-              profile_type: profile.profile_type,
-              voice_media_id: profile.voice_media_id,
-              hasVoiceMediaId: !!profile.voice_media_id
-            });
+          sound.setOnPlaybackStatusUpdate((status) => {
+            if (status.isLoaded && status.didJustFinish) {
+              setPlayingAudio(null);
+              sound.unloadAsync();
+            }
           });
-
-          // 부모 프로필 중 voice_media_id가 있는 것 찾기
-          const parentProfiles = allProfiles.filter(profile => profile.profile_type === 'PARENT');
-          console.log('부모 프로필들:', parentProfiles);
-
-          const parentProfile = parentProfiles.find(profile => profile.voice_media_id);
-          console.log('voice_media_id가 있는 부모 프로필:', parentProfile);
-
-          if (parentProfile?.voice_media_id) {
-            profileId = parentProfile.voice_media_id;
-            console.log('부모 프로필에서 voice_media_id 찾음:', profileId);
-          } else {
-            console.log('부모 프로필에도 voice_media_id가 없음');
-            console.log('전체 부모 프로필 voice_media_id 상태:',
-              parentProfiles.map(p => ({ name: p.name, voice_media_id: p.voice_media_id }))
-            );
-            Alert.alert('알림', '음성 프로필이 등록되지 않았습니다. 부모 프로필에서 음성을 먼저 등록해주세요.');
-            setPlayingAudio(null);
-            return;
-          }
-        } catch (error) {
-          console.error('부모 프로필 조회 실패:', error);
-          Alert.alert('오류', '음성 프로필을 가져오는데 실패했습니다.');
+        } catch (playError: any) {
           setPlayingAudio(null);
-          return;
         }
-      }
+      };
 
-      if (!profileId) {
-        console.log('음성 프로필이 없음');
-        Alert.alert('알림', '음성 프로필이 등록되지 않았습니다. 부모 프로필에서 음성을 먼저 등록해주세요.');
-        setPlayingAudio(null);
-        return;
-      }
-
-      console.log('TTS 요청 정보:', {
-        accountId,
-        profileId,
-        selectedProfile
-      });
-
-      // TTS API 호출
-      const ttsResponse = await aiApi.textToSpeech({
-        text: text,
-        account_id: accountId,
-        profile_id: profileId,
-      });
-
-      console.log('TTS 변환 완료:', ttsResponse);
-
-      // 메시지에 audioUrl 추가
-      setMessages(prev => prev.map(msg =>
-        msg.id === messageId && 'text' in msg
-          ? { ...msg, audioUrl: ttsResponse.audio_url }
-          : msg
-      ));
-
-      // 오디오 재생
-      if (ttsResponse.audio_url) {
-        const { sound } = await Audio.Sound.createAsync(
-          { uri: ttsResponse.audio_url },
-          { shouldPlay: true }
-        );
-
-        // 재생 완료 시 상태 초기화
-        sound.setOnPlaybackStatusUpdate((status) => {
-          if (status.isLoaded && status.didJustFinish) {
-            setPlayingAudio(null);
-            sound.unloadAsync();
-            // Data URI는 메모리 해제 불필요
-          }
-        });
-      }
-
-    } catch (error) {
-      console.error('TTS 변환 실패:', error);
-      Alert.alert('오류', 'TTS 변환에 실패했습니다.');
+    } catch (error: any) {
       setPlayingAudio(null);
     }
   };
 
-  // VQA API를 사용한 질문 전송 (자녀용)
+  // 목데이터를 사용한 질문 전송 (자녀용)
   const sendMessage = async (messageText?: string) => {
     const text = messageText || input.trim();
     if (!text) return;
-
-    // 이미지가 필요한 경우 먼저 업로드
-    const imageS3Url = await uploadImageToS3IfNeeded();
-    if (selectedImage && !imageS3Url) {
-      Alert.alert('오류', '이미지 업로드가 필요해요.');
-      return;
-    }
 
     // 사용자 메시지 추가
     const userMessage: TextMessage = {
@@ -433,72 +347,43 @@ export default function QuestionPage() {
     setInput("");
     setIsLoading(true);
 
-    try {
-      // 최신 토큰에서 직접 이름 추출
-      const latestToken = await getLatestToken();
-      const tokenData = tokenUtils.decodeToken(latestToken!);
-      const childName = tokenData?.profile_name || selectedProfile?.name || '아이';
+    // 목데이터 응답 생성
+    setTimeout(() => {
+      let mockResponse = '';
 
-      console.log('자녀용 - 전송할 프로필 정보:', {
-        tokenData: tokenData,
-        profileNameFromToken: tokenData?.profile_name,
-        selectedProfile: selectedProfile,
-        profileNameFromStore: selectedProfile?.name,
-        finalChildName: childName
-      });
-
-      // VQA API 직접 호출
-      const response = await aiApi.sendMessage({
-        imageS3Url: imageS3Url || undefined,
-        question: text,
-        childName: childName,
-      });
-
-      // 첫 번째 질문이면 카테고리를 title로 설정
-      if (questions.length === 0 && response.vqaDirectAnswer) {
-        const category = response.vqaDirectAnswer;
-        const categoryTitle = getCategoryTitle(category);
-        setConversationTitle(categoryTitle);
-        console.log('자녀용 - 대화 카테고리 설정:', categoryTitle);
+      // "이게 뭐야" 질문에 대한 목데이터 답변
+      if (text.includes('이게 뭐야') || text.includes('뭐야') || text.includes('무엇') || text.includes('뭔가')) {
+        mockResponse = '이건 귀여운 돼지예요! 지금 트램펄린이라는 재미있는 놀이기구 위에서 신나게 점프를 하고 있어요. 트램펄린은 탄력이 있는 천으로 만들어져서 폴짝폴짝 높이 뛸 수 있답니다. 돼지가 정말 즐거워 보이죠?';
+      } else {
+        // 기타 질문에 대한 일반 답변
+        mockResponse = '좋은 질문이에요! 사진을 보니 정말 재미있는 것 같아요. 더 궁금한 게 있으면 물어봐 주세요!';
       }
 
       // AI 응답 추가
       const aiMessage: TextMessage = {
         id: Date.now().toString() + "_pai",
         sender: "pai",
-        text: response.text,
+        text: mockResponse,
       };
       setMessages((prev) => [...prev, aiMessage]);
 
       // 대화 데이터에 질문-답변 추가
       const questionData: ConversationQuestion = {
         questionText: text,
-        answerText: response.text,
-        vqaDirectAnswer: response.vqaDirectAnswer,
+        answerText: mockResponse,
+        vqaDirectAnswer: undefined,
         questionOrder: questions.length + 1,
         createdAt: new Date().toISOString(),
         answer: {
-          answerText: response.text,
-          vqaDirectAnswer: response.vqaDirectAnswer,
+          answerText: mockResponse,
+          vqaDirectAnswer: undefined,
           createdAt: new Date().toISOString(),
         },
       };
 
       setQuestions((prev) => [...prev, questionData]);
-      console.log('자녀용 - 질문-답변 저장됨:', questionData);
-
-    } catch (error) {
-      console.error('자녀용 - VQA API 호출 실패:', error);
-      // 오류 시 친근한 응답
-      const errorMessage: TextMessage = {
-        id: Date.now().toString() + "_pai",
-        sender: "pai",
-        text: "미안해, 지금 대답하기 어려워. 조금 후에 다시 물어봐줄래? 😅",
-      };
-      setMessages((prev) => [...prev, errorMessage]);
-    } finally {
       setIsLoading(false);
-    }
+    }, 1000); // 1초 지연으로 실제 API 호출처럼 보이게
 
     setStep(3);
   };
@@ -517,8 +402,8 @@ export default function QuestionPage() {
             </TouchableOpacity>
             <Text style={styles.headerTitle}>질문하기</Text>
 
-          {/* 질문이 있는 경우에만 종료 버튼 표시 */}
-          {questions.length > 0 ? (
+          {/* 질문이 있는 경우에만 종료 버튼 표시 - 오른쪽 배치 */}
+          {questions.length > 0 && (
             <TouchableOpacity
               style={styles.endButton}
               onPress={endConversation}
@@ -530,8 +415,6 @@ export default function QuestionPage() {
                 종료
               </Text>
             </TouchableOpacity>
-          ) : (
-            <View style={{ width: 40 }} />
           )}
         </View>
       </SafeAreaView>
@@ -768,14 +651,14 @@ export default function QuestionPage() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff", padding: 16 },
-  header: { flexDirection: "row", alignItems: "center", marginBottom: 12 },
-  headerTitle: { fontSize: 18, fontWeight: "bold", marginLeft: 10 },
+  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 },
+  headerTitle: { fontSize: 18, fontWeight: "bold", marginLeft: 10, flex: 1 },
   center: { alignItems: "center", marginBottom: 20 },
   mascot: { width: 80, height: 80, marginBottom: 8 },
   title: { fontSize: 20, fontWeight: "bold", marginBottom: 6 },
   description: { fontSize: 14, color: "#666", textAlign: "center" },
   steps: { flexDirection: "row", justifyContent: "center", marginBottom: 20 },
-  stepActive: { color: "#2563eb", fontWeight: "bold" },
+  stepActive: { color: "#ec4899", fontWeight: "bold" },
   step: { color: "#aaa" },
   uploadBox: {
     borderWidth: 1,
@@ -901,7 +784,7 @@ const styles = StyleSheet.create({
   },
   chatImage: {
     width: 200,
-    height: 200,
+    height: 300,
     borderRadius: 12,
   },
   chatInputRow: {
@@ -931,7 +814,7 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
   endButton: {
-    backgroundColor: "#ef4444",
+    backgroundColor: "#ec4899",
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 6,

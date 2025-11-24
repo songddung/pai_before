@@ -36,65 +36,89 @@ export default function ParentQuizScreen() {
 
     setLoading(true);
     try {
-      console.log('부모용 퀴즈 데이터 조회 시작');
+      // 목데이터 - 자녀 퀴즈 현황
+      const today = new Date();
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
 
-      // 자녀 퀴즈 결과 조회 (실제 API)
-      try {
-        const childResults = await quizApi.getChildrenQuizResults();
-        console.log('자녀 퀴즈 결과 API 응답:', childResults);
-        console.log('자녀 퀴즈 결과 타입:', typeof childResults);
-        console.log('자녀 퀴즈 결과 길이:', Array.isArray(childResults) ? childResults.length : 'not array');
+      const mockChildQuizzes = [
+        {
+          id: '1',
+          question: '아빠가 가장 좋아하는 음식은 무엇일까요?',
+          answer: '김치찌개',
+          reward: '용돈 1000원',
+          category: '취향',
+          quizDate: today.toISOString().split('T')[0],
+          childResults: [
+            {
+              childId: '2',
+              childName: '정유진',
+              isSolved: true,
+              score: 100,
+              totalAttempts: 3,
+              lastAttemptDate: today.toISOString(),
+            },
+          ],
+        },
+        {
+          id: '2',
+          question: '엄마의 취미는 무엇일까요?',
+          answer: '독서',
+          reward: '간식 쿠폰',
+          category: '취향',
+          quizDate: today.toISOString().split('T')[0],
+          childResults: [
+            {
+              childId: '2',
+              childName: '정유진',
+              isSolved: false,
+              score: 0,
+              totalAttempts: 2,
+              lastAttemptDate: today.toISOString(),
+            },
+          ],
+        },
+        {
+          id: '3',
+          question: '아빠가 다니는 회사 이름은?',
+          answer: '삼성',
+          reward: '게임 시간 30분',
+          category: '일상',
+          quizDate: yesterday.toISOString().split('T')[0],
+          childResults: [
+            {
+              childId: '2',
+              childName: '정유진',
+              isSolved: true,
+              score: 100,
+              totalAttempts: 1,
+              lastAttemptDate: yesterday.toISOString(),
+            },
+          ],
+        },
+      ];
 
-        if (childResults && Array.isArray(childResults) && childResults.length > 0) {
-          setChildQuizzes(childResults);
+      setChildQuizzes(mockChildQuizzes);
 
-          // 요약 정보 계산
-          const completed = childResults.filter((quiz: any) => quiz.myResult?.isSolved);
-          const totalScore = completed.reduce((sum: number, quiz: any) => sum + (quiz.myResult?.score || 0), 0);
+      // 요약 정보 계산
+      const allResults = mockChildQuizzes.flatMap(quiz => quiz.childResults);
+      const completed = allResults.filter((result: any) => result.isSolved);
+      const totalScore = completed.reduce((sum: number, result: any) => sum + (result.score || 0), 0);
 
-          setSummary({
-            completedCount: completed.length,
-            accuracy: completed.length > 0 ? Math.round(totalScore / completed.length) : 0,
-          });
+      setSummary({
+        completedCount: completed.length,
+        accuracy: completed.length > 0 ? Math.round(totalScore / completed.length) : 0,
+      });
 
-          console.log('퀴즈 요약 정보 계산 완료:', {
-            totalQuizzes: childResults.length,
-            completedCount: completed.length,
-            accuracy: completed.length > 0 ? Math.round(totalScore / completed.length) : 0
-          });
-        } else {
-          console.log('자녀 퀴즈 결과가 비어있거나 배열이 아님');
-          setChildQuizzes([]);
-          setSummary({
-            completedCount: 0,
-            accuracy: 0,
-          });
-        }
-      } catch (quizError: any) {
-        console.error('자녀 퀴즈 조회 API 실패:', quizError);
-        console.error('자녀 퀴즈 조회 에러 상세:', {
-          status: quizError.response?.status,
-          data: quizError.response?.data,
-          message: quizError.message
-        });
-        setChildQuizzes([]);
-        setSummary({
-          completedCount: 0,
-          accuracy: 0,
-        });
-      }
+      // 최근 생성한 퀴즈 (목데이터)
+      setRecentQuizzes(mockChildQuizzes);
 
-      // TODO: 최근 생성한 퀴즈 API가 구현되면 추가
-      setRecentQuizzes([]);
-
-      // 자녀 목록 조회
+      // 자녀 목록 조회 (실제 API 사용)
       try {
         const profiles = await profileApi.getAllProfiles();
         const childProfiles = profiles.filter(profile => profile.profile_type === 'CHILD');
-        console.log('자녀 프로필:', childProfiles);
         setChildren(childProfiles);
       } catch (profileError) {
-        console.error('자녀 프로필 조회 실패:', profileError);
         setChildren([]);
       }
 
@@ -250,8 +274,7 @@ export default function ParentQuizScreen() {
           </View>
         </View>
 
-        {/* 최근 생성한 퀴즈 - 임시 숨김 */}
-        {false && (
+        {/* 최근 생성한 퀴즈 */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <Text style={styles.cardTitle}>최근 생성한 퀴즈</Text>
@@ -262,10 +285,7 @@ export default function ParentQuizScreen() {
           ) : recentQuizzes.length > 0 ? (
             recentQuizzes.map((quiz) => (
               <View key={quiz.id} style={styles.recentQuizBox}>
-                <View style={{ flexDirection: "row", marginBottom: 6 }}>
-                  <Text style={styles.tagNew}>신규</Text>
-                  <Text style={styles.tagCategory}>취향</Text>
-                </View>
+                {/* 헤더: 질문 + 편집/삭제 버튼 */}
                 <View style={styles.quizHeaderRow}>
                   <Text style={styles.quizQuestion}>{quiz.question}</Text>
                   <View style={styles.actionRow}>
@@ -283,10 +303,41 @@ export default function ParentQuizScreen() {
                     </TouchableOpacity>
                   </View>
                 </View>
+
                 <Text style={styles.quizAnswer}>정답: {quiz.answer}</Text>
+                <Text style={styles.quizCategory}>카테고리: {quiz.category} | 보상: {quiz.reward}</Text>
+
+                {/* 자녀 제출 현황 */}
+                {quiz.childResults && quiz.childResults.length > 0 && (
+                  <View style={styles.childResultsContainer}>
+                    <Text style={styles.childResultsTitle}>자녀 제출 현황:</Text>
+                    {quiz.childResults.map((result: any, index: number) => (
+                      <View key={index} style={styles.childResultItem}>
+                        <Text style={styles.childResultName}>{result.childName}</Text>
+                        {result.isSolved ? (
+                          <View style={styles.resultBadge}>
+                            <Ionicons name="checkmark-circle" size={16} color="#22c55e" />
+                            <Text style={styles.resultCorrect}>정답 ({result.score}점, {result.totalAttempts}번 시도)</Text>
+                          </View>
+                        ) : result.totalAttempts > 0 ? (
+                          <View style={styles.resultBadge}>
+                            <Ionicons name="time" size={16} color="#f59e0b" />
+                            <Text style={styles.resultInProgress}>진행중 ({result.totalAttempts}번 시도)</Text>
+                          </View>
+                        ) : (
+                          <View style={styles.resultBadge}>
+                            <Ionicons name="play-circle" size={16} color="#9ca3af" />
+                            <Text style={styles.resultNotStarted}>미시작</Text>
+                          </View>
+                        )}
+                      </View>
+                    ))}
+                  </View>
+                )}
+
                 <View style={styles.quizFooter}>
                   <Text style={styles.quizDate}>
-                    {quiz.quizDate === "2025-09-26"
+                    {quiz.quizDate === new Date().toISOString().split('T')[0]
                       ? "오늘 생성"
                       : quiz.quizDate}
                   </Text>
@@ -304,20 +355,19 @@ export default function ParentQuizScreen() {
             </View>
           )}
         </View>
-        )}
 
         {/* 아이의 퀴즈 현황 */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>아이의 퀴즈 현황</Text>
           {children.length > 0 ? (
             children.map((child, index) => {
-              // 프로필별로 순환하여 piggy 이미지 할당 (piggy1, piggy2, piggy3)
-              const piggyImages = [
-                require('../../../../assets/images/piggy1.jpg'),
-                require('../../../../assets/images/piggy2.jpg'),
-                require('../../../../assets/images/piggy3.jpg'),
-              ];
-              const piggyImage = piggyImages[index % 3];
+              // avatar_media_id를 기반으로 piggy 이미지 매칭
+              const piggyImages: { [key: string]: any } = {
+                piggy1: require('../../../../assets/images/piggy1.jpg'),
+                piggy2: require('../../../../assets/images/piggy2.jpg'),
+                piggy3: require('../../../../assets/images/piggy3.jpg'),
+              };
+              const piggyImage = piggyImages[child.avatar_media_id] || require('../../../../assets/images/piggy1.jpg');
 
               return (
                 <TouchableOpacity
