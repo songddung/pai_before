@@ -11,6 +11,7 @@ import {
   CreateProfileDto,
   LoginResponse,
 } from '@shared-types';
+import { MOCK_CONFIG, userMockApi, profileMockApi } from '../../../shared/api/mock';
 
 // 유저 서비스 전용 API 클라이언트
 const userApiClient = createApiClient(SERVICE_URLS.USER);
@@ -19,24 +20,36 @@ const userApiClient = createApiClient(SERVICE_URLS.USER);
 export const userApi = {
   // 회원가입
   async register(userData: CreateUserDto): Promise<UserResponse> {
+    if (MOCK_CONFIG.USE_MOCK_API) {
+      return userMockApi.register(userData);
+    }
     const response = await userApiClient.post('/api/users', userData);
     return handleApiResponse(response);
   },
 
   // 로그인
   async login(credentials: LoginDto): Promise<LoginResponse> {
+    if (MOCK_CONFIG.USE_MOCK_API) {
+      return userMockApi.login(credentials);
+    }
     const response = await userApiClient.post('/api/users/login', credentials);
     return handleApiResponse(response);
   },
 
   // 로그아웃
   async logout(): Promise<void> {
+    if (MOCK_CONFIG.USE_MOCK_API) {
+      return userMockApi.logout();
+    }
     const response = await userApiClient.post('/api/users/logout');
     return handleApiResponse(response);
   },
 
   // 토큰 갱신
   async refreshToken(refreshToken: string): Promise<{ access_token: string; refresh_token: string }> {
+    if (MOCK_CONFIG.USE_MOCK_API) {
+      return userMockApi.refreshToken(refreshToken);
+    }
     const response = await userApiClient.post('/api/users/refresh', {
       refresh_token: refreshToken,
     });
@@ -48,12 +61,18 @@ export const userApi = {
 export const profileApi = {
   // 프로필 생성
   async createProfile(profileData: CreateProfileDto): Promise<ProfileResponse> {
+    if (MOCK_CONFIG.USE_MOCK_API) {
+      return profileMockApi.createProfile(profileData);
+    }
     const response = await userApiClient.post('/api/profile', profileData);
     return handleApiResponse<ProfileResponse>(response);
   },
 
   // 프로필 목록 조회
   async getAllProfiles(): Promise<ProfileResponse[]> {
+    if (MOCK_CONFIG.USE_MOCK_API) {
+      return profileMockApi.getAllProfiles();
+    }
     const response = await userApiClient.get('/api/profile');
     return handleApiResponse<ProfileResponse[]>(response);
   },
@@ -64,7 +83,13 @@ export const profileApi = {
     profileType: 'PARENT' | 'CHILD',
     pin?: string,
   ): Promise<{ access_token: string; refresh_token: string }> {
-    console.log('profileApi.selectProfile 호출:', { profileId, profileType, pin: pin ? '****' : undefined });
+    if (!MOCK_CONFIG.USE_MOCK_API) {
+      console.log('profileApi.selectProfile 호출:', { profileId, profileType, pin: pin ? '****' : undefined });
+    }
+
+    if (MOCK_CONFIG.USE_MOCK_API) {
+      return profileMockApi.selectProfile(profileId, profileType, pin);
+    }
 
     const body: any = {
       profile_type: profileType,
@@ -79,9 +104,17 @@ export const profileApi = {
       `/api/profile/${profileId}/select`,
       body,
     );
-    console.log('profileApi.selectProfile 원본 응답:', response.data);
+
+    if (!MOCK_CONFIG.USE_MOCK_API) {
+      console.log('profileApi.selectProfile 원본 응답:', response.data);
+    }
+
     const result = handleApiResponse<{ access_token: string; refresh_token: string }>(response);
-    console.log('profileApi.selectProfile 처리된 결과:', result);
+
+    if (!MOCK_CONFIG.USE_MOCK_API) {
+      console.log('profileApi.selectProfile 처리된 결과:', result);
+    }
+
     return result;
   },
 
@@ -90,6 +123,9 @@ export const profileApi = {
     profileId: string,
     profileData: any,
   ): Promise<ProfileResponse> {
+    if (MOCK_CONFIG.USE_MOCK_API) {
+      return profileMockApi.updateProfile(profileId, profileData);
+    }
     const response = await userApiClient.patch(
       `/api/profile/${profileId}`,
       profileData,
@@ -99,12 +135,18 @@ export const profileApi = {
 
   // 프로필 삭제
   async deleteProfile(profileId: string): Promise<void> {
+    if (MOCK_CONFIG.USE_MOCK_API) {
+      return profileMockApi.deleteProfile(profileId);
+    }
     const response = await userApiClient.delete(`/api/profile/${profileId}`);
     return handleApiResponse(response);
   },
 
   // PIN 설정
   async updatePin(profileId: string, pin: string): Promise<void> {
+    if (MOCK_CONFIG.USE_MOCK_API) {
+      return profileMockApi.updatePin(profileId, pin);
+    }
     const response = await userApiClient.patch(
       `/api/profile/${profileId}/pin`,
       { pin },
@@ -114,20 +156,41 @@ export const profileApi = {
 
   // PIN 검증
   async verifyPin(profileId: string, pin: string): Promise<{ valid: boolean }> {
-    console.log('profileApi.verifyPin 호출:', { profileId, pin });
+    if (!MOCK_CONFIG.USE_MOCK_API) {
+      console.log('profileApi.verifyPin 호출:', { profileId, pin });
+    }
+
+    if (MOCK_CONFIG.USE_MOCK_API) {
+      return profileMockApi.verifyPin(profileId, pin);
+    }
+
     const response = await userApiClient.post(
       `/api/profile/${profileId}/pin/verify`,
       { pin },
     );
-    console.log('profileApi.verifyPin 원본 응답:', response.data);
+
+    if (!MOCK_CONFIG.USE_MOCK_API) {
+      console.log('profileApi.verifyPin 원본 응답:', response.data);
+    }
+
     const result = handleApiResponse<{ valid: boolean }>(response);
-    console.log('profileApi.verifyPin 처리된 결과:', result);
+
+    if (!MOCK_CONFIG.USE_MOCK_API) {
+      console.log('profileApi.verifyPin 처리된 결과:', result);
+    }
+
     return result;
   },
 
   // 음성 등록
   async registerVoice(profileId: string, audioUri: string): Promise<{ voice_id: string }> {
-    console.log('profileApi.registerVoice 호출:', { profileId, audioUri });
+    if (!MOCK_CONFIG.USE_MOCK_API) {
+      console.log('profileApi.registerVoice 호출:', { profileId, audioUri });
+    }
+
+    if (MOCK_CONFIG.USE_MOCK_API) {
+      return profileMockApi.registerVoice(profileId, audioUri);
+    }
 
     const formData = new FormData();
 
@@ -149,9 +212,16 @@ export const profileApi = {
       },
     );
 
-    console.log('profileApi.registerVoice 원본 응답:', response.data);
+    if (!MOCK_CONFIG.USE_MOCK_API) {
+      console.log('profileApi.registerVoice 원본 응답:', response.data);
+    }
+
     const result = handleApiResponse<{ voice_id: string }>(response);
-    console.log('profileApi.registerVoice 처리된 결과:', result);
+
+    if (!MOCK_CONFIG.USE_MOCK_API) {
+      console.log('profileApi.registerVoice 처리된 결과:', result);
+    }
+
     return result;
   },
 };

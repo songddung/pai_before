@@ -21,6 +21,7 @@ import { profileApi } from '@/domains/user/api/userApi';
 import { tokenStorage } from '../shared/api/client';
 import { tokenUtils } from '../shared/utils/token';
 import { useAuthStore } from '../domains/user/models/user';
+import { MOCK_CONFIG } from '../shared/api/mock/mockConfig';
 
 export default function ProfileSelect() {
   const router = useRouter();
@@ -44,51 +45,71 @@ export default function ProfileSelect() {
   const [pinInput, setPinInput] = useState('');
   const [pinError, setPinError] = useState('');
 
+  // Mock 모드에서는 console.log를 억제하는 헬퍼 함수
+  const log = (...args: any[]) => {
+    if (!MOCK_CONFIG.USE_MOCK_API) {
+      console.log(...args);
+    }
+  };
+  const logError = (...args: any[]) => {
+    if (!MOCK_CONFIG.USE_MOCK_API) {
+      console.error(...args);
+    }
+  };
+
   // 프로필 선택 핸들러
   const handleSelectProfile = async (profile: any) => {
     if (profile.profile_type === 'CHILD') {
       try {
-        console.log('아이 프로필 선택 시작:', {
-          profile_id: profile.profile_id,
-          name: profile.name,
-          profile_type: profile.profile_type,
-          현재인증상태: isAuthenticated,
-          현재토큰있음: !!accessToken,
-        });
+        if (!MOCK_CONFIG.USE_MOCK_API) {
+          console.log('아이 프로필 선택 시작:', {
+            profile_id: profile.profile_id,
+            name: profile.name,
+            profile_type: profile.profile_type,
+            현재인증상태: isAuthenticated,
+            현재토큰있음: !!accessToken,
+          });
 
-        // 현재 토큰 상태 확인
-        const currentAccessToken = await tokenStorage.getAccessToken();
-        const currentRefreshToken = await tokenStorage.getRefreshToken();
-        console.log('아이 프로필 선택 전 토큰 상태:', {
-          hasAccessToken: !!currentAccessToken,
-          hasRefreshToken: !!currentRefreshToken,
-          accessTokenLength: currentAccessToken?.length,
-          refreshTokenLength: currentRefreshToken?.length,
-        });
+          // 현재 토큰 상태 확인
+          const currentAccessToken = await tokenStorage.getAccessToken();
+          const currentRefreshToken = await tokenStorage.getRefreshToken();
+          console.log('아이 프로필 선택 전 토큰 상태:', {
+            hasAccessToken: !!currentAccessToken,
+            hasRefreshToken: !!currentRefreshToken,
+            accessTokenLength: currentAccessToken?.length,
+            refreshTokenLength: currentRefreshToken?.length,
+          });
+        }
 
         // AuthProvider의 selectProfile 사용 (토큰 상태 동기화를 위해)
-        console.log('아이 프로필 선택 중:', profile.profile_id);
+        if (!MOCK_CONFIG.USE_MOCK_API) {
+          console.log('아이 프로필 선택 중:', profile.profile_id);
+        }
         const success = await selectProfileFromAuth(profile.profile_id, 'CHILD');
 
-        console.log('아이 프로필 선택 결과:', { success });
+        if (!MOCK_CONFIG.USE_MOCK_API) {
+          console.log('아이 프로필 선택 결과:', { success });
+        }
 
         if (success) {
-          console.log('아이 프로필 선택 성공');
+          if (!MOCK_CONFIG.USE_MOCK_API) {
+            console.log('아이 프로필 선택 성공');
 
-          // 새로운 토큰 상태 확인
-          const newAccessToken = await tokenStorage.getAccessToken();
-          const newRefreshToken = await tokenStorage.getRefreshToken();
-          console.log('아이 프로필 선택 후 새로운 토큰 상태:', {
-            hasNewAccessToken: !!newAccessToken,
-            hasNewRefreshToken: !!newRefreshToken,
-            newAccessTokenLength: newAccessToken?.length,
-            newRefreshTokenLength: newRefreshToken?.length,
-          });
+            // 새로운 토큰 상태 확인
+            const newAccessToken = await tokenStorage.getAccessToken();
+            const newRefreshToken = await tokenStorage.getRefreshToken();
+            console.log('아이 프로필 선택 후 새로운 토큰 상태:', {
+              hasNewAccessToken: !!newAccessToken,
+              hasNewRefreshToken: !!newRefreshToken,
+              newAccessTokenLength: newAccessToken?.length,
+              newRefreshTokenLength: newRefreshToken?.length,
+            });
 
-          console.log('질문 페이지로 이동:', {
-            pathname: '/(child)/question',
-            params: { id: profile.profile_id, name: profile.name },
-          });
+            console.log('질문 페이지로 이동:', {
+              pathname: '/(child)/question',
+              params: { id: profile.profile_id, name: profile.name },
+            });
+          }
 
           router.replace({
             pathname: '/(child)/question',
@@ -98,15 +119,19 @@ export default function ProfileSelect() {
             },
           });
         } else {
-          console.error('아이 프로필 선택 실패 - AuthProvider에서 false 반환');
+          if (!MOCK_CONFIG.USE_MOCK_API) {
+            console.error('아이 프로필 선택 실패 - AuthProvider에서 false 반환');
+          }
           throw new Error('프로필 선택 실패');
         }
       } catch (error: any) {
-        console.error('아이 프로필 선택 실패:', {
-          error: error?.message || String(error),
-          status: error?.response?.status,
-          data: error?.response?.data,
-        });
+        if (!MOCK_CONFIG.USE_MOCK_API) {
+          console.error('아이 프로필 선택 실패:', {
+            error: error?.message || String(error),
+            status: error?.response?.status,
+            data: error?.response?.data,
+          });
+        }
         // 에러 알림 표시하지 않음 - 조용히 처리
       }
     } else {
@@ -240,22 +265,24 @@ export default function ProfileSelect() {
       console.log('프로필 선택 페이지 - zustand store 초기화');
       setZustandSelectedProfile(null);
 
-      // 현재 토큰 정보 확인
-      const currentToken = await tokenStorage.getAccessToken();
-      if (currentToken) {
-        const tokenData = tokenUtils.decodeToken(currentToken);
-        console.log('프로필 선택 페이지 - 현재 토큰 정보:', {
-          hasToken: !!currentToken,
-          tokenLength: currentToken.length,
-          profile_id: tokenData?.profile_id,
-          profile_name: tokenData?.profile_name,
-          profile_type: tokenData?.profile_type,
-          exp: tokenData?.exp,
-          현재시간: new Date().getTime() / 1000,
-          만료여부: tokenData?.exp ? (tokenData.exp < (new Date().getTime() / 1000) ? '만료됨' : '유효함') : '확인불가',
-        });
-      } else {
-        console.log('프로필 선택 페이지 - 토큰 없음');
+      // Mock 모드가 아닐 때만 토큰 정보 확인
+      if (!MOCK_CONFIG.USE_MOCK_API) {
+        const currentToken = await tokenStorage.getAccessToken();
+        if (currentToken) {
+          const tokenData = tokenUtils.decodeToken(currentToken);
+          console.log('프로필 선택 페이지 - 현재 토큰 정보:', {
+            hasToken: !!currentToken,
+            tokenLength: currentToken.length,
+            profile_id: tokenData?.profile_id,
+            profile_name: tokenData?.profile_name,
+            profile_type: tokenData?.profile_type,
+            exp: tokenData?.exp,
+            현재시간: new Date().getTime() / 1000,
+            만료여부: tokenData?.exp ? (tokenData.exp < (new Date().getTime() / 1000) ? '만료됨' : '유효함') : '확인불가',
+          });
+        } else {
+          console.log('프로필 선택 페이지 - 토큰 없음');
+        }
       }
 
       // 인증되지 않은 경우 로그인 화면으로 이동
@@ -499,38 +526,44 @@ export default function ProfileSelect() {
 
       {/* 프로필 리스트 */}
       <View style={styles.profileRow}>
-        {profiles.map((profile, index) => (
-          <TouchableOpacity
-            key={`profile-${profile.profile_id}-${index}`}
-            style={[
-              styles.profileCard,
-              profile.profile_type === 'CHILD'
-                ? { backgroundColor: '#f472b6' }
-                : { backgroundColor: '#3b82f6' },
-              // 한 줄에 3개씩 배치
-              { flexBasis: '30%', marginHorizontal: 5 },
-            ]}
-            onPress={() => handleSelectProfile(profile)}
-          >
-            <Image
-              source={
-                profile.avatar_url
-                  ? { uri: profile.avatar_url }
-                  : require('../../assets/default-avatar.png')
-              }
-              style={{
-                width: 50,
-                height: 50,
-                borderRadius: 25,
-                marginBottom: 8,
-              }}
-            />
-            <Text style={styles.name}>{profile.name}</Text>
-            <Text style={styles.role}>
-              {profile.profile_type === 'PARENT' ? '부모' : '아이'}
-            </Text>
-          </TouchableOpacity>
-        ))}
+        {profiles.map((profile, index) => {
+          // 프로필별로 순환하여 piggy 이미지 할당 (piggy1, piggy2, piggy3)
+          const piggyImages = [
+            require('../../assets/images/piggy1.jpg'),
+            require('../../assets/images/piggy2.jpg'),
+            require('../../assets/images/piggy3.jpg'),
+          ];
+          const piggyImage = piggyImages[index % 3];
+
+          return (
+            <TouchableOpacity
+              key={`profile-${profile.profile_id}-${index}`}
+              style={[
+                styles.profileCard,
+                profile.profile_type === 'CHILD'
+                  ? { backgroundColor: '#f472b6' }
+                  : { backgroundColor: '#3b82f6' },
+                // 한 줄에 3개씩 배치
+                { flexBasis: '30%', marginHorizontal: 5 },
+              ]}
+              onPress={() => handleSelectProfile(profile)}
+            >
+              <Image
+                source={piggyImage}
+                style={{
+                  width: 50,
+                  height: 50,
+                  borderRadius: 25,
+                  marginBottom: 8,
+                }}
+              />
+              <Text style={styles.name}>{profile.name}</Text>
+              <Text style={styles.role}>
+                {profile.profile_type === 'PARENT' ? '부모' : '아이'}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
 
         {/* 프로필 추가 버튼 */}
         <TouchableOpacity

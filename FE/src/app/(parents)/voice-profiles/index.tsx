@@ -3,6 +3,7 @@ import { useRouter, useFocusEffect } from "expo-router";
 import React, { useEffect, useState, useCallback } from "react";
 import {
   FlatList,
+  Image,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -101,12 +102,25 @@ export default function VoiceProfilesScreen() {
       <FlatList
         data={voiceProfiles}
         keyExtractor={(item) => `voice-profile-${item.profile_id}`}
-        renderItem={({ item }) => (
-          <View style={styles.profileItem}>
-            <Ionicons name="person-circle" size={28} color="#2563eb" />
-            <Text style={styles.profileText}>{item.name}</Text>
-          </View>
-        )}
+        renderItem={({ item, index }) => {
+          // 프로필별로 순환하여 piggy 이미지 할당 (piggy1, piggy2, piggy3)
+          const piggyImages = [
+            require('../../../../assets/images/piggy1.jpg'),
+            require('../../../../assets/images/piggy2.jpg'),
+            require('../../../../assets/images/piggy3.jpg'),
+          ];
+          const piggyImage = piggyImages[index % 3];
+
+          return (
+            <View style={styles.profileItem}>
+              <Image
+                source={piggyImage}
+                style={styles.profileImage}
+              />
+              <Text style={styles.profileText}>{item.name}</Text>
+            </View>
+          );
+        }}
         ListEmptyComponent={
           <Text
             style={{ textAlign: "center", marginTop: 20, color: "#6b7280" }}
@@ -155,6 +169,11 @@ const styles = StyleSheet.create({
     padding: 16,
     borderBottomWidth: 1,
     borderColor: "#e5e7eb",
+  },
+  profileImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
   },
   profileText: { marginLeft: 12, fontSize: 16, color: "#111827" },
   addButton: {

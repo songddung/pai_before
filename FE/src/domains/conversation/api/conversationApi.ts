@@ -1,4 +1,5 @@
 import { createApiClient, SERVICE_URLS, handleApiResponse } from '../../../shared/api/client';
+import { MOCK_CONFIG, conversationMockApi } from '../../../shared/api/mock';
 
 // 대화 서비스 전용 API 클라이언트
 const conversationApiClient = createApiClient(SERVICE_URLS.CONVERSATION);
@@ -42,24 +43,37 @@ interface StartConversationResponse {
 export const conversationApi = {
   // 대화 시작
   async startConversation(data: StartConversationRequest): Promise<StartConversationResponse> {
+    if (MOCK_CONFIG.USE_MOCK_API) {
+      return conversationMockApi.startConversation(data);
+    }
     const response = await conversationApiClient.post('/api/conversations/start', data);
     return handleApiResponse<StartConversationResponse>(response);
   },
 
   // 대화 종료
   async endConversation(conversationId: string, data?: EndConversationRequest) {
+    if (MOCK_CONFIG.USE_MOCK_API) {
+      return conversationMockApi.endConversation(conversationId, data);
+    }
     const response = await conversationApiClient.post(`/api/conversations/${conversationId}/end`, data || {});
     return handleApiResponse(response);
   },
 
   // 대화 상세 조회
   async getConversation(conversationId: string) {
+    if (MOCK_CONFIG.USE_MOCK_API) {
+      return conversationMockApi.getConversation(conversationId);
+    }
     const response = await conversationApiClient.get(`/api/conversations/${conversationId}`);
     return handleApiResponse(response);
   },
 
   // 대화 이미지 목록 조회
   async getConversationImages(params: ConversationImagesQuery) {
+    if (MOCK_CONFIG.USE_MOCK_API) {
+      return conversationMockApi.getConversationImages(params);
+    }
+
     const queryParams = new URLSearchParams({
       childId: params.childId,
       ...(params.page && { page: params.page.toString() }),
@@ -72,12 +86,19 @@ export const conversationApi = {
 
   // Redis 대화 데이터 조회 (개발/디버깅용)
   async getRedisConversationData(conversationId: string) {
+    if (MOCK_CONFIG.USE_MOCK_API) {
+      return conversationMockApi.getRedisConversationData(conversationId);
+    }
     const response = await conversationApiClient.get(`/api/conversations/${conversationId}/redis-data`);
     return handleApiResponse(response);
   },
 
   // 메시지 전송 및 AI 응답 받기
   async sendMessage(data: SendMessageRequest): Promise<AIResponse> {
+    if (MOCK_CONFIG.USE_MOCK_API) {
+      return conversationMockApi.sendMessage(data);
+    }
+
     const formData = new FormData();
     formData.append('message', data.message);
 

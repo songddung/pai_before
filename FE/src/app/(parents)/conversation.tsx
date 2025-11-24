@@ -147,14 +147,9 @@ export default function ParentConversationPage() {
                 p.profile_type === 'PARENT',
             );
 
-            console.log('현재 프로필 음성 등록 상태:', {
-              currentProfile: currentProfile,
-              hasVoice: !!currentProfile?.voice_media_id,
-            });
-
             setHasVoiceProfile(!!currentProfile?.voice_media_id);
           } catch (error) {
-            console.error('프로필 조회 실패:', error);
+            // 에러 발생 시 조용히 처리
             setHasVoiceProfile(false);
           }
         }
@@ -282,7 +277,12 @@ export default function ParentConversationPage() {
       return;
     }
 
-    const tokenData = tokenUtils.decodeToken(accessToken!);
+    if (!accessToken) {
+      Alert.alert('오류', '인증 정보가 없습니다.');
+      return;
+    }
+
+    const tokenData = tokenUtils.decodeToken(accessToken);
     if (!tokenData?.profile_id) {
       Alert.alert('오류', '프로필 정보를 찾을 수 없습니다.');
       return;

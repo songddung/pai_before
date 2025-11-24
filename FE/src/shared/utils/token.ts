@@ -19,7 +19,7 @@ export const tokenUtils = {
       const payload = jwtDecode<JWTPayload>(token);
       return payload.sub;
     } catch (error) {
-      console.error('Token decode failed:', error);
+      // 에러 로그 제거 - 조용히 null 반환
       return null;
     }
   },
@@ -51,7 +51,7 @@ export const tokenUtils = {
     try {
       return jwtDecode<JWTPayload>(token);
     } catch (error) {
-      console.error('Token decode failed:', error);
+      // 에러 로그 제거 - 조용히 null 반환
       return null;
     }
   },

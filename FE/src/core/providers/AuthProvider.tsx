@@ -5,6 +5,7 @@ import { tokenUtils } from '../../shared/utils/token';
 import { profileApi } from '../../domains/user/api/userApi';
 import { setTokenCallbacks, tokenStorage } from '../../shared/api/client';
 import { useAuthStore } from '../../domains/user/models/user';
+import { MOCK_CONFIG } from '../../shared/api/mock/mockConfig';
 // 타입 정의 (shared-types 대신 로컬 정의)
 interface LoginRequest {
   email: string;
@@ -243,17 +244,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const selectProfile = async (profileId: string, profileType: 'PARENT' | 'CHILD', pin?: string): Promise<boolean> => {
     // 중복 프로필 선택 방지
     if (isProfileSelecting) {
-      console.warn('AuthProvider: 이미 프로필 선택 중 - 요청 무시');
+      if (!MOCK_CONFIG.USE_MOCK_API) {
+        console.warn('AuthProvider: 이미 프로필 선택 중 - 요청 무시');
+      }
       return false;
     }
 
     // 현재 선택된 프로필과 동일한 경우 무시
     const currentToken = await tokenStorage.getAccessToken();
     if (currentToken) {
-      const currentTokenData = tokenUtils.decodeToken(currentToken);
+      const currentTokenData = MOCK_CONFIG.USE_MOCK_API ? null : tokenUtils.decodeToken(currentToken);
       if (currentTokenData?.profile_id?.toString() === profileId &&
           currentTokenData?.profile_type === profileType) {
-        console.log('AuthProvider: 이미 동일한 프로필 선택됨 - 요청 무시');
+        if (!MOCK_CONFIG.USE_MOCK_API) {
+          console.log('AuthProvider: 이미 동일한 프로필 선택됨 - 요청 무시');
+        }
         return true;
       }
     }
@@ -262,64 +267,77 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsProfileSelecting(true);
       isProfileSelectingRef.current = true;
 
-      if (!authState.accessToken) {
-        console.error('AuthProvider: 액세스 토큰이 없음');
-        throw new Error('No access token available');
+      // Mock 모드가 아닐 때만 토큰 검증
+      if (!MOCK_CONFIG.USE_MOCK_API) {
+        if (!authState.accessToken) {
+          console.error('AuthProvider: 액세스 토큰이 없음');
+          throw new Error('No access token available');
+        }
       }
 
-      console.log('AuthProvider: 프로필 선택 시작:', { profileId, profileType, hasPin: !!pin });
+      if (!MOCK_CONFIG.USE_MOCK_API) {
+        console.log('AuthProvider: 프로필 선택 시작:', { profileId, profileType, hasPin: !!pin });
+      }
 
-      // 현재 토큰 상태 로깅
-      const currentToken = await tokenStorage.getAccessToken();
-      const currentRefresh = await tokenStorage.getRefreshToken();
-      console.log('AuthProvider: 프로필 선택 전 토큰 상태:', {
-        hasCurrentToken: !!currentToken,
-        hasCurrentRefresh: !!currentRefresh,
-        currentTokenLength: currentToken?.length,
-        refreshTokenLength: currentRefresh?.length,
-      });
+      // Mock 모드가 아닐 때만 토큰 상태 로깅
+      if (!MOCK_CONFIG.USE_MOCK_API) {
+        const currentToken = await tokenStorage.getAccessToken();
+        const currentRefresh = await tokenStorage.getRefreshToken();
+        console.log('AuthProvider: 프로필 선택 전 토큰 상태:', {
+          hasCurrentToken: !!currentToken,
+          hasCurrentRefresh: !!currentRefresh,
+          currentTokenLength: currentToken?.length,
+          refreshTokenLength: currentRefresh?.length,
+        });
+      }
 
       const result = await profileApi.selectProfile(profileId, profileType, pin);
-      console.log('AuthProvider: 프로필 선택 API 응답:', {
-        hasAccessToken: !!result.access_token,
-        hasRefreshToken: !!result.refresh_token,
-        accessTokenLength: result.access_token?.length,
-        refreshTokenLength: result.refresh_token?.length,
-      });
+      if (!MOCK_CONFIG.USE_MOCK_API) {
+        console.log('AuthProvider: 프로필 선택 API 응답:', {
+          hasAccessToken: !!result.access_token,
+          hasRefreshToken: !!result.refresh_token,
+          accessTokenLength: result.access_token?.length,
+          refreshTokenLength: result.refresh_token?.length,
+        });
+      }
 
       if (result.access_token && result.refresh_token) {
-        // 토큰 유효성 검증
-        try {
-          const decodedToken = tokenUtils.decodeToken(result.access_token);
-          console.log('AuthProvider: 새 토큰 유효성 검증:', {
-            hasPayload: !!decodedToken,
-            sub: decodedToken?.sub,
-            profile_id: decodedToken?.profile_id,
-            profile_type: decodedToken?.profile_type,
-            profile_name: decodedToken?.profile_name,
-            exp: decodedToken?.exp,
-            현재시간: new Date().getTime() / 1000,
-            만료여부: decodedToken?.exp ? (decodedToken.exp < (new Date().getTime() / 1000) ? '만료됨' : '유효함') : '확인불가',
-          });
+        // Mock 모드가 아닐 때만 토큰 유효성 검증
+        if (!MOCK_CONFIG.USE_MOCK_API) {
+          try {
+            const decodedToken = tokenUtils.decodeToken(result.access_token);
+            console.log('AuthProvider: 새 토큰 유효성 검증:', {
+              hasPayload: !!decodedToken,
+              sub: decodedToken?.sub,
+              profile_id: decodedToken?.profile_id,
+              profile_type: decodedToken?.profile_type,
+              profile_name: decodedToken?.profile_name,
+              exp: decodedToken?.exp,
+              현재시간: new Date().getTime() / 1000,
+              만료여부: decodedToken?.exp ? (decodedToken.exp < (new Date().getTime() / 1000) ? '만료됨' : '유효함') : '확인불가',
+            });
 
-          // 토큰이 만료되었으면 에러
-          if (decodedToken?.exp && decodedToken.exp < (new Date().getTime() / 1000)) {
-            console.error('AuthProvider: 새로 받은 토큰이 이미 만료됨');
-            throw new Error('Received expired token');
-          }
+            // 토큰이 만료되었으면 에러
+            if (decodedToken?.exp && decodedToken.exp < (new Date().getTime() / 1000)) {
+              console.error('AuthProvider: 새로 받은 토큰이 이미 만료됨');
+              throw new Error('Received expired token');
+            }
 
-          // 프로필 정보가 없으면 에러
-          if (!decodedToken?.profile_id) {
-            console.error('AuthProvider: 새 토큰에 프로필 정보 없음');
-            throw new Error('Token missing profile information');
+            // 프로필 정보가 없으면 에러
+            if (!decodedToken?.profile_id) {
+              console.error('AuthProvider: 새 토큰에 프로필 정보 없음');
+              throw new Error('Token missing profile information');
+            }
+          } catch (decodeError) {
+            console.error('AuthProvider: 토큰 디코딩 실패:', decodeError);
+            throw new Error('Invalid token format');
           }
-        } catch (decodeError) {
-          console.error('AuthProvider: 토큰 디코딩 실패:', decodeError);
-          throw new Error('Invalid token format');
         }
 
         // 새로운 토큰 저장 (토큰 저장소와 상태 동시 업데이트)
-        console.log('AuthProvider: 새로운 토큰 저장 시작');
+        if (!MOCK_CONFIG.USE_MOCK_API) {
+          console.log('AuthProvider: 새로운 토큰 저장 시작');
+        }
 
         try {
           await UserService.saveTokens(result.access_token, result.refresh_token);
@@ -334,17 +352,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             savedRefresh = await tokenStorage.getRefreshToken();
 
             if (savedToken && savedRefresh) {
-              console.log('AuthProvider: 토큰 저장 확인 성공:', {
-                토큰저장됨: !!savedToken,
-                리프레시저장됨: !!savedRefresh,
-                저장된토큰길이: savedToken?.length,
-                저장된리프레시길이: savedRefresh?.length,
-                saveRetryCount,
-              });
+              if (!MOCK_CONFIG.USE_MOCK_API) {
+                console.log('AuthProvider: 토큰 저장 확인 성공:', {
+                  토큰저장됨: !!savedToken,
+                  리프레시저장됨: !!savedRefresh,
+                  저장된토큰길이: savedToken?.length,
+                  저장된리프레시길이: savedRefresh?.length,
+                  saveRetryCount,
+                });
+              }
               break;
             }
 
-            console.warn(`AuthProvider: 토큰 저장 확인 실패 (${saveRetryCount + 1}/${maxSaveRetries}), 재시도 중...`);
+            if (!MOCK_CONFIG.USE_MOCK_API) {
+              console.warn(`AuthProvider: 토큰 저장 확인 실패 (${saveRetryCount + 1}/${maxSaveRetries}), 재시도 중...`);
+            }
             saveRetryCount++;
 
             if (saveRetryCount < maxSaveRetries) {
@@ -354,7 +376,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
           }
         } catch (saveError) {
-          console.error('AuthProvider: 토큰 저장 오류:', saveError);
+          if (!MOCK_CONFIG.USE_MOCK_API) {
+            console.error('AuthProvider: 토큰 저장 오류:', saveError);
+          }
           // 토큰 저장 실패해도 계속 진행 (메모리상 상태는 업데이트)
         }
 
@@ -368,12 +392,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // zustand store에 선택된 프로필 정보 업데이트
         try {
           // 새로운 토큰에서 프로필 정보 추출
-          const decodedNewToken = tokenUtils.decodeToken(result.access_token);
-          console.log('AuthProvider: 새 토큰에서 프로필 정보 추출:', {
-            profile_id: decodedNewToken?.profile_id,
-            profile_name: decodedNewToken?.profile_name,
-            profile_type: decodedNewToken?.profile_type,
-          });
+          const decodedNewToken = MOCK_CONFIG.USE_MOCK_API ? null : tokenUtils.decodeToken(result.access_token);
+          if (!MOCK_CONFIG.USE_MOCK_API) {
+            console.log('AuthProvider: 새 토큰에서 프로필 정보 추출:', {
+              profile_id: decodedNewToken?.profile_id,
+              profile_name: decodedNewToken?.profile_name,
+              profile_type: decodedNewToken?.profile_type,
+            });
+          }
 
           // 프로필 상세 정보 조회 (profile_id와 profile_type 모두 확인)
           const allProfiles = await profileApi.getAllProfiles();
@@ -384,16 +410,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           );
 
           if (selectedProfileData) {
-            console.log('AuthProvider: zustand store에 프로필 정보 업데이트:', selectedProfileData);
+            if (!MOCK_CONFIG.USE_MOCK_API) {
+              console.log('AuthProvider: zustand store에 프로필 정보 업데이트:', selectedProfileData);
+            }
             setZustandSelectedProfile(selectedProfileData);
           } else {
-            console.warn('AuthProvider: 선택된 프로필 정보를 찾을 수 없음');
+            if (!MOCK_CONFIG.USE_MOCK_API) {
+              console.warn('AuthProvider: 선택된 프로필 정보를 찾을 수 없음');
+            }
           }
         } catch (profileError) {
-          console.error('AuthProvider: 프로필 정보 업데이트 실패:', profileError);
+          if (!MOCK_CONFIG.USE_MOCK_API) {
+            console.error('AuthProvider: 프로필 정보 업데이트 실패:', profileError);
+          }
         }
 
-        console.log('AuthProvider: 프로필 선택 성공');
+        if (!MOCK_CONFIG.USE_MOCK_API) {
+          console.log('AuthProvider: 프로필 선택 성공');
+        }
 
         // 토큰 업데이트 완료를 위한 지연 (안정화 시간 증가)
         await new Promise(resolve => setTimeout(resolve, 300));
@@ -407,15 +441,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const finalRefreshToken = await tokenStorage.getRefreshToken();
 
           if (finalAccessToken && finalRefreshToken) {
-            console.log('AuthProvider: 토큰 상태 최종 검증 완료:', {
-              tokenLength: finalAccessToken.length,
-              refreshLength: finalRefreshToken.length,
-              retryCount,
-            });
+            if (!MOCK_CONFIG.USE_MOCK_API) {
+              console.log('AuthProvider: 토큰 상태 최종 검증 완료:', {
+                tokenLength: finalAccessToken.length,
+                refreshLength: finalRefreshToken.length,
+                retryCount,
+              });
+            }
             return true;
           }
 
-          console.warn(`AuthProvider: 토큰 상태 검증 실패 (${retryCount + 1}/${maxRetries}), 재시도 중...`);
+          if (!MOCK_CONFIG.USE_MOCK_API) {
+            console.warn(`AuthProvider: 토큰 상태 검증 실패 (${retryCount + 1}/${maxRetries}), 재시도 중...`);
+          }
           retryCount++;
 
           if (retryCount < maxRetries) {
@@ -423,24 +461,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         }
 
-        console.error('AuthProvider: 토큰 상태 검증 최종 실패');
+        if (!MOCK_CONFIG.USE_MOCK_API) {
+          console.error('AuthProvider: 토큰 상태 검증 최종 실패');
+        }
         // 토큰 상태가 불일치해도 프로필 선택 자체는 성공으로 처리
         return true;
       }
 
-      console.error('AuthProvider: 프로필 선택 응답에 토큰 없음');
+      if (!MOCK_CONFIG.USE_MOCK_API) {
+        console.error('AuthProvider: 프로필 선택 응답에 토큰 없음');
+      }
       return false;
     } catch (error) {
       const errorObj = error as any;
-      console.error('AuthProvider: 프로필 선택 실패:', {
-        error: errorObj?.message || String(error),
-        status: errorObj?.response?.status,
-        data: errorObj?.response?.data,
-      });
+      if (!MOCK_CONFIG.USE_MOCK_API) {
+        console.error('AuthProvider: 프로필 선택 실패:', {
+          error: errorObj?.message || String(error),
+          status: errorObj?.response?.status,
+          data: errorObj?.response?.data,
+        });
+      }
 
       // 401 오류인 경우 로그아웃 처리
       if (errorObj?.response?.status === 401) {
-        console.log('AuthProvider: 401 오류로 인한 로그아웃 처리');
+        if (!MOCK_CONFIG.USE_MOCK_API) {
+          console.log('AuthProvider: 401 오류로 인한 로그아웃 처리');
+        }
         await logout();
       }
 

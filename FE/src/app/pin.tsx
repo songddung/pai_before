@@ -4,6 +4,7 @@ import { StyleSheet, Text, TouchableOpacity, View, Alert } from 'react-native';
 import axios from 'axios';
 import { useAuth } from '../domains/user/hooks/useAuth';
 import { profileApi } from '../domains/user/api/userApi';
+import { MOCK_CONFIG } from '../shared/api/mock/mockConfig';
 
 export default function PinScreen() {
   const router = useRouter();
@@ -26,36 +27,48 @@ export default function PinScreen() {
       return;
     }
 
-    console.log('PIN 검증 시작:', { profileId, pin: inputPin });
+    if (!MOCK_CONFIG.USE_MOCK_API) {
+      console.log('PIN 검증 시작:', { profileId, pin: inputPin });
+    }
 
     setIsVerifying(true);
     try {
       // PIN 검증만 수행 (프로필은 이미 선택됨)
-      console.log('PIN 검증 중...');
+      if (!MOCK_CONFIG.USE_MOCK_API) {
+        console.log('PIN 검증 중...');
+      }
       const verifyResult = await profileApi.verifyPin(profileId, inputPin);
-      console.log('PIN 검증 응답:', verifyResult);
-      console.log('PIN 검증 결과 타입:', typeof verifyResult);
-      console.log('PIN 검증 valid 값:', verifyResult?.valid);
-      console.log('PIN 검증 valid 타입:', typeof verifyResult?.valid);
+      if (!MOCK_CONFIG.USE_MOCK_API) {
+        console.log('PIN 검증 응답:', verifyResult);
+        console.log('PIN 검증 결과 타입:', typeof verifyResult);
+        console.log('PIN 검증 valid 값:', verifyResult?.valid);
+        console.log('PIN 검증 valid 타입:', typeof verifyResult?.valid);
+      }
 
       if (verifyResult && verifyResult.valid === true) {
-        console.log('PIN 검증 성공! 다음 화면으로 이동...');
+        if (!MOCK_CONFIG.USE_MOCK_API) {
+          console.log('PIN 검증 성공! 다음 화면으로 이동...');
+        }
         // PIN 검증 성공 - 바로 다음 화면으로 이동 (프로필은 이미 선택됨)
         router.replace('/(parents)/voice-profiles');
       } else {
-        console.log('PIN 검증 실패:', verifyResult);
+        if (!MOCK_CONFIG.USE_MOCK_API) {
+          console.log('PIN 검증 실패:', verifyResult);
+        }
         setError('잘못된 PIN입니다.');
         setPin('');
       }
     } catch (err: any) {
-      console.error('PIN 검증 실패:', err);
-      console.error('오류 상세:', {
-        message: err.message,
-        status: err.response?.status,
-        data: err.response?.data,
-        url: err.config?.url,
-        headers: err.config?.headers,
-      });
+      if (!MOCK_CONFIG.USE_MOCK_API) {
+        console.error('PIN 검증 실패:', err);
+        console.error('오류 상세:', {
+          message: err.message,
+          status: err.response?.status,
+          data: err.response?.data,
+          url: err.config?.url,
+          headers: err.config?.headers,
+        });
+      }
 
       if (err.response?.status === 401) {
         setError('인증이 만료되었습니다. 다시 로그인해주세요.');

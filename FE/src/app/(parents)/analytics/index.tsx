@@ -97,7 +97,7 @@ export default function AnalyticsChildList() {
           <Ionicons name="chevron-back" size={24} color="#111827" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>자녀 선택</Text>
-        <View style={{ width: 24 }} /> {/* 오른쪽 여백 맞춤 */}
+        <View style={{ width: 24 }} />
       </View>
 
       {/* 🔹 Child List */}
@@ -112,40 +112,47 @@ export default function AnalyticsChildList() {
             </Text>
           </View>
         )}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={styles.card}
-            onPress={() => {
-              console.log('분석 리포트 이동:', {
-                childId: item.profile_id.toString(),
-                name: item.name,
-                pathname: '/(parents)/analytics/[childId]'
-              });
+        renderItem={({ item, index }) => {
+          // 프로필별로 순환하여 piggy 이미지 할당 (piggy1, piggy2, piggy3)
+          const piggyImages = [
+            require('../../../../assets/images/piggy1.jpg'),
+            require('../../../../assets/images/piggy2.jpg'),
+            require('../../../../assets/images/piggy3.jpg'),
+          ];
+          const piggyImage = piggyImages[index % 3];
 
-              router.push({
-                pathname: '/(parents)/analytics/[childId]',
-                params: {
+          return (
+            <TouchableOpacity
+              style={styles.card}
+              onPress={() => {
+                console.log('분석 리포트 이동:', {
                   childId: item.profile_id.toString(),
                   name: item.name,
-                },
-              });
-            }}
-          >
-            <Image
-              source={item.avatar_media_id
-                ? { uri: `https://j13c101.p.ssafy.io/api/media/${item.avatar_media_id}` }
-                : require('../../../../assets/default-avatar.png')
-              }
-              style={styles.avatar}
-            />
-            <View>
-              <Text style={styles.name}>{item.name}</Text>
-              <Text style={styles.subText}>
-                {item.birth_date} · {item.gender}
-              </Text>
-            </View>
-          </TouchableOpacity>
-        )}
+                  pathname: '/(parents)/analytics/[childId]'
+                });
+
+                router.push({
+                  pathname: '/(parents)/analytics/[childId]',
+                  params: {
+                    childId: item.profile_id.toString(),
+                    name: item.name,
+                  },
+                });
+              }}
+            >
+              <Image
+                source={piggyImage}
+                style={styles.avatar}
+              />
+              <View>
+                <Text style={styles.name}>{item.name}</Text>
+                <Text style={styles.subText}>
+                  {item.birth_date} · {item.gender}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          );
+        }}
       />
     </SafeAreaView>
   );

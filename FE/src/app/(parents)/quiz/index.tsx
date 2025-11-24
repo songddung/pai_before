@@ -310,29 +310,39 @@ export default function ParentQuizScreen() {
         <View style={styles.card}>
           <Text style={styles.cardTitle}>아이의 퀴즈 현황</Text>
           {children.length > 0 ? (
-            children.map((child) => (
-              <TouchableOpacity
-                key={child.profile_id}
-                style={styles.childCard}
-                onPress={() =>
-                  router.push({
-                    pathname: "/(parents)/quiz/children/[id]",
-                    params: { id: child.profile_id, name: child.name },
-                  })
-                }
-              >
-                {/* 프로필 사진 대신 아이콘 표시 */}
-                <View style={styles.childIconContainer}>
-                  <Ionicons name="person" size={24} color="#6b7280" />
-                </View>
-                <View>
-                  <Text style={styles.childName}>{child.name}</Text>
-                  <Text style={styles.childInfo}>
-                    {child.birth_date ? new Date(child.birth_date).toLocaleDateString('ko-KR') : '생년월일 미등록'} · {child.gender || '성별 미등록'}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            ))
+            children.map((child, index) => {
+              // 프로필별로 순환하여 piggy 이미지 할당 (piggy1, piggy2, piggy3)
+              const piggyImages = [
+                require('../../../../assets/images/piggy1.jpg'),
+                require('../../../../assets/images/piggy2.jpg'),
+                require('../../../../assets/images/piggy3.jpg'),
+              ];
+              const piggyImage = piggyImages[index % 3];
+
+              return (
+                <TouchableOpacity
+                  key={child.profile_id}
+                  style={styles.childCard}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/(parents)/quiz/children/[id]",
+                      params: { id: child.profile_id, name: child.name },
+                    })
+                  }
+                >
+                  <Image
+                    source={piggyImage}
+                    style={styles.childAvatar}
+                  />
+                  <View>
+                    <Text style={styles.childName}>{child.name}</Text>
+                    <Text style={styles.childInfo}>
+                      {child.birth_date ? new Date(child.birth_date).toLocaleDateString('ko-KR') : '생년월일 미등록'} · {child.gender || '성별 미등록'}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })
           ) : (
             <Text style={{ textAlign: 'center', color: '#6b7280', padding: 20 }}>
               등록된 자녀가 없습니다.
