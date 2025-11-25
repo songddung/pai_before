@@ -3,6 +3,9 @@ import axios from "axios";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -11,86 +14,130 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function QuizEditScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams(); // URL에서 quiz id 받기
 
   // 임시 상태 (실제론 API 요청으로 불러오기)
-  const [question, setQuestion] = useState("엄마가 가장 좋아하는 색깔은?");
-  const [answer, setAnswer] = useState("파란색");
+  const [question, setQuestion] = useState("아빠가 가장 좋아하는 음식은 무엇일까요?");
+  const [answer, setAnswer] = useState("김치찌개");
+  const [hint, setHint] = useState("한국 대표 음식이에요");
   const [reward, setReward] = useState("용돈 1000원");
+  const [quizDate, setQuizDate] = useState(() => {
+    const today = new Date();
+    const threeDaysLater = new Date(today);
+    threeDaysLater.setDate(threeDaysLater.getDate() + 3);
+    return threeDaysLater.toISOString().split('T')[0];
+  });
 
   const handleSave = async () => {
     try {
-      const res = await axios.patch(
-        `https://j13c101.p.ssafy.io/api/quiz/${id}`,
-        {
-          question,
-          answer,
-          reward,
-        },
-        {
-          headers: {
-            Authorization: `Bearer <부모용 토큰>`, // 👉 TODO: 로그인 시 받은 토큰으로 교체
-          },
-        }
-      );
+      // AsyncStorage에서 현재 퀴즈 목록 가져오기
+      const storedQuizzes = await AsyncStorage.getItem('mockQuizzes');
 
-      if (res.data.success) {
-        alert("퀴즈가 성공적으로 수정되었습니다.");
-        router.back(); // 수정 완료 후 원래 화면으로 이동
-      } else {
-        alert(res.data.message || "수정 실패");
+      if (storedQuizzes) {
+        const quizzes = JSON.parse(storedQuizzes);
+
+        // 해당 ID의 퀴즈 찾아서 업데이트
+        const updatedQuizzes = quizzes.map((quiz: any) => {
+          if (quiz.id === id) {
+            return {
+              ...quiz,
+              question,
+              answer,
+              hint,
+              reward,
+              quizDate,
+            };
+          }
+          return quiz;
+        });
+
+        // AsyncStorage에 다시 저장
+        await AsyncStorage.setItem('mockQuizzes', JSON.stringify(updatedQuizzes));
+
+        Alert.alert("성공", "퀴즈가 성공적으로 수정되었습니다.", [
+          {
+            text: "확인",
+            onPress: () => router.back(),
+          },
+        ]);
       }
     } catch (err: any) {
-      console.error("퀴즈 수정 실패:", err.response?.data || err.message);
-      alert(err.response?.data?.message || "퀴즈 수정 중 오류가 발생했습니다.");
+      console.error("퀴즈 수정 실패:", err);
+      Alert.alert("실패", "퀴즈 수정 중 오류가 발생했습니다.");
     }
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-        {/* 헤더 */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.push("/(parents)/quiz")}>
-            <Ionicons name="chevron-back" size={24} color="#111827" />
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={{ flex: 1 }}
+        keyboardVerticalOffset={0}
+      >
+        <ScrollView
+          contentContainerStyle={{ paddingBottom: 40 }}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* 헤더 */}
+          <View style={styles.header}>
+            <TouchableOpacity onPress={() => router.push("/(parents)/quiz")}>
+              <Ionicons name="chevron-back" size={24} color="#111827" />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>퀴즈 편집</Text>
+            <View style={{ width: 24 }} />
+          </View>
+
+          {/* 입력 폼 */}
+          <Text style={styles.label}>질문 *</Text>
+          <TextInput
+            style={styles.input}
+            value={question}
+            onChangeText={setQuestion}
+            placeholder="질문을 입력하세요"
+          />
+
+          <Text style={styles.label}>정답 *</Text>
+          <TextInput
+            style={styles.input}
+            value={answer}
+            onChangeText={setAnswer}
+            placeholder="정답을 입력하세요"
+          />
+
+          <Text style={styles.label}>힌트 (선택)</Text>
+          <TextInput
+            style={styles.input}
+            value={hint}
+            onChangeText={setHint}
+            placeholder="힌트를 입력하세요"
+          />
+
+          <Text style={styles.label}>보상 (선택)</Text>
+          <TextInput
+            style={styles.input}
+            value={reward}
+            onChangeText={setReward}
+            placeholder="보상을 입력하세요"
+          />
+
+          <Text style={styles.label}>출제일 *</Text>
+          <TextInput
+            style={styles.input}
+            value={quizDate}
+            onChangeText={setQuizDate}
+            placeholder="예: 2025-01-15"
+          />
+
+          {/* 저장 버튼 */}
+          <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
+            <Text style={styles.saveText}>저장하기</Text>
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>퀴즈 편집</Text>
-          <View style={{ width: 24 }} />
-        </View>
-
-        {/* 입력 폼 */}
-        <Text style={styles.label}>질문</Text>
-        <TextInput
-          style={styles.input}
-          value={question}
-          onChangeText={setQuestion}
-          placeholder="질문을 입력하세요"
-        />
-
-        <Text style={styles.label}>정답</Text>
-        <TextInput
-          style={styles.input}
-          value={answer}
-          onChangeText={setAnswer}
-          placeholder="정답을 입력하세요"
-        />
-
-        <Text style={styles.label}>보상</Text>
-        <TextInput
-          style={styles.input}
-          value={reward}
-          onChangeText={setReward}
-          placeholder="보상을 입력하세요 (선택)"
-        />
-
-        {/* 저장 버튼 */}
-        <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-          <Text style={styles.saveText}>저장하기</Text>
-        </TouchableOpacity>
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

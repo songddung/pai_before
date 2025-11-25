@@ -83,23 +83,24 @@ export default function VoiceProfilesScreen() {
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-  <TouchableOpacity
-    style={styles.backButton}
-    onPress={() => router.push("/profile-select")}
-  >
-    <Ionicons name="chevron-back" size={24} color="#111827" />
-  </TouchableOpacity>
-  <Text style={styles.headerTitle}>음성 프로필 목록</Text>
-  <TouchableOpacity
-    style={styles.refreshButton}
-    onPress={fetchProfiles}
-  >
-    <Ionicons name="refresh" size={20} color="#6366f1" />
-  </TouchableOpacity>
-</View>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => router.push("/profile-select")}
+        >
+          <Ionicons name="chevron-back" size={24} color="#111827" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>음성 프로필 목록</Text>
+        <TouchableOpacity
+          style={styles.refreshButton}
+          onPress={fetchProfiles}
+        >
+          <Ionicons name="refresh" size={20} color="#6366f1" />
+        </TouchableOpacity>
+      </View>
 
       {/* 프로필 리스트 */}
       <FlatList
+        contentContainerStyle={{ padding: 16 }}
         data={voiceProfiles}
         keyExtractor={(item) => `voice-profile-${item.profile_id}`}
         renderItem={({ item, index }) => {
@@ -111,22 +112,31 @@ export default function VoiceProfilesScreen() {
           };
           const piggyImage = piggyImages[item.avatar_media_id] || require('../../../../assets/images/piggy1.jpg');
 
+          // 부모 프로필이면 기본값 제공
+          const birthDate = item.birth_date || '1997-04-01';
+          const role = '아빠';
+
           return (
-            <View style={styles.profileItem}>
+            <View style={styles.card}>
               <Image
                 source={piggyImage}
-                style={styles.profileImage}
+                style={styles.avatar}
               />
-              <Text style={styles.profileText}>{item.name}</Text>
+              <View>
+                <Text style={styles.name}>{item.name}</Text>
+                <Text style={styles.subText}>
+                  {birthDate} · {role}
+                </Text>
+              </View>
             </View>
           );
         }}
         ListEmptyComponent={
-          <Text
-            style={{ textAlign: "center", marginTop: 20, color: "#6b7280" }}
-          >
-            등록된 음성 프로필이 없습니다.
-          </Text>
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 50 }}>
+            <Text style={{ color: '#6b7280', textAlign: 'center' }}>
+              등록된 음성 프로필이 없습니다.
+            </Text>
+          </View>
         }
       />
 
@@ -142,12 +152,13 @@ export default function VoiceProfilesScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
+  container: { flex: 1, backgroundColor: "#f9fafb" },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
   headerTitle: {
     fontSize: 18,
@@ -157,25 +168,36 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   backButton: {
-    paddingLeft: 12,
-  },
-  refreshButton: {
-    paddingRight: 12,
     padding: 4,
   },
-  profileItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 16,
-    borderBottomWidth: 1,
-    borderColor: "#e5e7eb",
+  refreshButton: {
+    padding: 4,
   },
-  profileImage: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    padding: 20,
+    borderRadius: 12,
+    marginBottom: 16,
+    elevation: 2,
   },
-  profileText: { marginLeft: 12, fontSize: 16, color: "#111827" },
+  avatar: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    marginRight: 16
+  },
+  name: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#111827'
+  },
+  subText: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginTop: 4
+  },
   addButton: {
     position: "absolute",
     bottom: 24,

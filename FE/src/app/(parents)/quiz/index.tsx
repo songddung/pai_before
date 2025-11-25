@@ -12,6 +12,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from "../../../domains/user/hooks/useAuth";
 import { quizApi } from "../../../domains/quiz/api/quizApi";
 import { profileApi } from "../../../domains/user/api/userApi";
@@ -36,81 +37,98 @@ export default function ParentQuizScreen() {
 
     setLoading(true);
     try {
-      // 목데이터 - 자녀 퀴즈 현황
-      const today = new Date();
-      const yesterday = new Date(today);
-      yesterday.setDate(yesterday.getDate() - 1);
+      // AsyncStorage에서 퀴즈 데이터 가져오기
+      const storedQuizzes = await AsyncStorage.getItem('mockQuizzes');
 
-      const mockChildQuizzes = [
-        {
-          id: '1',
-          question: '아빠가 가장 좋아하는 음식은 무엇일까요?',
-          answer: '김치찌개',
-          reward: '용돈 1000원',
-          category: '취향',
-          quizDate: today.toISOString().split('T')[0],
-          childResults: [
-            {
-              childId: '2',
-              childName: '정유진',
-              isSolved: true,
-              score: 100,
-              totalAttempts: 3,
-              lastAttemptDate: today.toISOString(),
-            },
-          ],
-        },
-        {
-          id: '2',
-          question: '엄마의 취미는 무엇일까요?',
-          answer: '독서',
-          reward: '간식 쿠폰',
-          category: '취향',
-          quizDate: today.toISOString().split('T')[0],
-          childResults: [
-            {
-              childId: '2',
-              childName: '정유진',
-              isSolved: false,
-              score: 0,
-              totalAttempts: 2,
-              lastAttemptDate: today.toISOString(),
-            },
-          ],
-        },
-        {
-          id: '3',
-          question: '아빠가 다니는 회사 이름은?',
-          answer: '삼성',
-          reward: '게임 시간 30분',
-          category: '일상',
-          quizDate: yesterday.toISOString().split('T')[0],
-          childResults: [
-            {
-              childId: '2',
-              childName: '정유진',
-              isSolved: true,
-              score: 100,
-              totalAttempts: 1,
-              lastAttemptDate: yesterday.toISOString(),
-            },
-          ],
-        },
-      ];
+      let mockChildQuizzes;
+
+      if (storedQuizzes) {
+        // 저장된 데이터가 있으면 사용
+        mockChildQuizzes = JSON.parse(storedQuizzes);
+      } else {
+        // 없으면 기본 목데이터 생성
+        const today = new Date();
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        const threeDaysLater = new Date(today);
+        threeDaysLater.setDate(threeDaysLater.getDate() + 3);
+
+        mockChildQuizzes = [
+          {
+            id: '1',
+            question: '아빠가 가장 좋아하는 음식은 무엇일까요?',
+            answer: '김치찌개',
+            hint: '한국 대표 음식이에요',
+            reward: '용돈 1000원',
+            category: '취향',
+            quizDate: threeDaysLater.toISOString().split('T')[0],
+            childResults: [],
+          },
+          {
+            id: '2',
+            question: '엄마의 취미는 무엇일까요?',
+            answer: '독서',
+            hint: '',
+            reward: '간식 쿠폰',
+            category: '취향',
+            quizDate: today.toISOString().split('T')[0],
+            childResults: [
+              {
+                childId: '1',
+                childName: '김민규',
+                isSolved: true,
+                score: 100,
+                totalAttempts: 1,
+                lastAttemptDate: today.toISOString(),
+              },
+              {
+                childId: '2',
+                childName: '정유진',
+                isSolved: false,
+                score: 0,
+                totalAttempts: 2,
+                lastAttemptDate: today.toISOString(),
+              },
+            ],
+          },
+          {
+            id: '3',
+            question: '아빠가 다니는 회사 이름은?',
+            answer: '삼성',
+            hint: '대한민국 1등 기업',
+            reward: '게임 시간 30분',
+            category: '일상',
+            quizDate: yesterday.toISOString().split('T')[0],
+            childResults: [
+              {
+                childId: '2',
+                childName: '정유진',
+                isSolved: true,
+                score: 100,
+                totalAttempts: 1,
+                lastAttemptDate: yesterday.toISOString(),
+              },
+            ],
+          },
+        ];
+
+        // 기본 데이터를 AsyncStorage에 저장
+        await AsyncStorage.setItem('mockQuizzes', JSON.stringify(mockChildQuizzes));
+      }
 
       setChildQuizzes(mockChildQuizzes);
 
-      // 요약 정보 계산
-      const allResults = mockChildQuizzes.flatMap(quiz => quiz.childResults);
-      const completed = allResults.filter((result: any) => result.isSolved);
-      const totalScore = completed.reduce((sum: number, result: any) => sum + (result.score || 0), 0);
+      // 요약 정보 계산 - 날짜 기준
+      const today = new Date().toISOString().split('T')[0];
+      const completedQuizzes = mockChildQuizzes.filter((quiz: any) => quiz.quizDate < today);
+      const inProgressQuizzes = mockChildQuizzes.filter((quiz: any) => quiz.quizDate === today);
 
       setSummary({
-        completedCount: completed.length,
-        accuracy: completed.length > 0 ? Math.round(totalScore / completed.length) : 0,
+        completedCount: completedQuizzes.length,
+        accuracy: inProgressQuizzes.length,
       });
 
-      // 최근 생성한 퀴즈 (목데이터)
+      // 최근 생성한 퀴즈
       setRecentQuizzes(mockChildQuizzes);
 
       // 자녀 목록 조회 (실제 API 사용)
@@ -160,16 +178,28 @@ export default function ParentQuizScreen() {
 
   // 삭제
   const handleDelete = (id: string) => {
-    Alert.alert("삭제", `퀴즈 ${id}를 삭제하시겠습니까?`, [
+    Alert.alert("삭제", "퀴즈를 삭제하시겠습니까?", [
       { text: "취소", style: "cancel" },
       {
         text: "삭제",
         style: "destructive",
         onPress: async () => {
           try {
-            await quizApi.deleteQuiz(id);
-            setRecentQuizzes((prev) => prev.filter((q) => q.id !== id));
-            Alert.alert("완료", "퀴즈가 성공적으로 삭제되었습니다.");
+            // AsyncStorage에서 퀴즈 목록 가져오기
+            const storedQuizzes = await AsyncStorage.getItem('mockQuizzes');
+
+            if (storedQuizzes) {
+              const quizzes = JSON.parse(storedQuizzes);
+              // 해당 ID 제외하고 필터링
+              const updatedQuizzes = quizzes.filter((q: any) => q.id !== id);
+
+              // AsyncStorage에 다시 저장
+              await AsyncStorage.setItem('mockQuizzes', JSON.stringify(updatedQuizzes));
+
+              // 화면 업데이트
+              setRecentQuizzes(updatedQuizzes);
+              Alert.alert("완료", "퀴즈가 성공적으로 삭제되었습니다.");
+            }
           } catch (err: any) {
             console.error("퀴즈 삭제 실패:", err);
             Alert.alert("실패", "퀴즈 삭제 중 오류가 발생했습니다.");
@@ -221,10 +251,10 @@ export default function ParentQuizScreen() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#f9fafb" }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#f9fafb" }} edges={['top']}>
       <ScrollView
         style={styles.container}
-        contentContainerStyle={{ paddingBottom: 100 }}
+        contentContainerStyle={{ paddingBottom: 20 }}
       >
         {/* 헤더 */}
         <View style={styles.header}>
@@ -239,11 +269,11 @@ export default function ParentQuizScreen() {
         <View style={styles.summaryRow}>
           <SummaryCard
             icon={<CheckCircle size={20} color="green" />}
-            title="완료된 퀴즈"
+            title="완료"
             value={`${summary.completedCount}개`}
-            sub={`정답률 ${summary.accuracy}%`}
-            subColor={{ color: "#16a34a" }}
-            fullWidth // 👈 전체 폭 옵션 추가
+            sub={`진행중 ${summary.accuracy}개`}
+            subColor={{ color: "#f59e0b" }}
+            fullWidth
           />
         </View>
 
@@ -283,67 +313,92 @@ export default function ParentQuizScreen() {
           {loading ? (
             <Text style={{ textAlign: "center" }}>불러오는 중...</Text>
           ) : recentQuizzes.length > 0 ? (
-            recentQuizzes.map((quiz) => (
-              <View key={quiz.id} style={styles.recentQuizBox}>
-                {/* 헤더: 질문 + 편집/삭제 버튼 */}
-                <View style={styles.quizHeaderRow}>
-                  <Text style={styles.quizQuestion}>{quiz.question}</Text>
-                  <View style={styles.actionRow}>
-                    <TouchableOpacity
-                      style={styles.editButton}
-                      onPress={() => handleEdit(quiz.id)}
-                    >
-                      <Text style={styles.editText}>편집</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.deleteButton}
-                      onPress={() => handleDelete(quiz.id)}
-                    >
-                      <Text style={styles.deleteText}>삭제</Text>
-                    </TouchableOpacity>
+            recentQuizzes.map((quiz) => {
+              const today = new Date().toISOString().split('T')[0];
+              const isFutureQuiz = quiz.quizDate > today;
+
+              return (
+                <View key={quiz.id} style={styles.recentQuizBox}>
+                  {/* 헤더: 날짜 + 편집/삭제 버튼 */}
+                  <View style={styles.quizHeader}>
+                    <Text style={[
+                      styles.quizDate,
+                      quiz.quizDate === today && styles.quizDateToday
+                    ]}>
+                      {quiz.quizDate === today
+                        ? "오늘 출제"
+                        : `출제일: ${quiz.quizDate}`}
+                    </Text>
+                    {isFutureQuiz && (
+                      <View style={styles.actionRow}>
+                        <TouchableOpacity
+                          style={styles.editButton}
+                          onPress={() => handleEdit(quiz.id)}
+                        >
+                          <Text style={styles.editText}>편집</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.deleteButton}
+                          onPress={() => handleDelete(quiz.id)}
+                        >
+                          <Text style={styles.deleteText}>삭제</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
                   </View>
+
+                {/* 퀴즈 내용 */}
+                <View style={styles.quizContentArea}>
+                  <Text style={styles.quizQuestion}>{quiz.question}</Text>
+                  <Text style={styles.quizAnswer}>정답: {quiz.answer}</Text>
+                  <Text style={styles.quizReward}>보상: {quiz.reward}</Text>
                 </View>
 
-                <Text style={styles.quizAnswer}>정답: {quiz.answer}</Text>
-                <Text style={styles.quizCategory}>카테고리: {quiz.category} | 보상: {quiz.reward}</Text>
+                {/* 자녀 프로필 */}
+                <View style={styles.childProfilesContainer}>
+                  {children.map((child) => {
+                    // avatar_media_id를 기반으로 piggy 이미지 매칭
+                    const piggyImages: { [key: string]: any } = {
+                      piggy1: require('../../../../assets/images/piggy1.jpg'),
+                      piggy2: require('../../../../assets/images/piggy2.jpg'),
+                      piggy3: require('../../../../assets/images/piggy3.jpg'),
+                    };
+                    const piggyImage = piggyImages[child.avatar_media_id] || require('../../../../assets/images/piggy1.jpg');
 
-                {/* 자녀 제출 현황 */}
-                {quiz.childResults && quiz.childResults.length > 0 && (
-                  <View style={styles.childResultsContainer}>
-                    <Text style={styles.childResultsTitle}>자녀 제출 현황:</Text>
-                    {quiz.childResults.map((result: any, index: number) => (
-                      <View key={index} style={styles.childResultItem}>
-                        <Text style={styles.childResultName}>{result.childName}</Text>
-                        {result.isSolved ? (
-                          <View style={styles.resultBadge}>
-                            <Ionicons name="checkmark-circle" size={16} color="#22c55e" />
-                            <Text style={styles.resultCorrect}>정답 ({result.score}점, {result.totalAttempts}번 시도)</Text>
-                          </View>
-                        ) : result.totalAttempts > 0 ? (
-                          <View style={styles.resultBadge}>
-                            <Ionicons name="time" size={16} color="#f59e0b" />
-                            <Text style={styles.resultInProgress}>진행중 ({result.totalAttempts}번 시도)</Text>
-                          </View>
-                        ) : (
-                          <View style={styles.resultBadge}>
-                            <Ionicons name="play-circle" size={16} color="#9ca3af" />
-                            <Text style={styles.resultNotStarted}>미시작</Text>
-                          </View>
+                    // 해당 자녀가 퀴즈를 맞췄는지 확인
+                    const childResult = quiz.childResults?.find((r: any) => r.childName === child.name);
+                    const isSolved = childResult?.isSolved || false;
+
+                    return (
+                      <View key={child.profile_id} style={styles.childProfileItem}>
+                        <Image
+                          source={piggyImage}
+                          style={[
+                            styles.childProfileAvatar,
+                            isSolved && styles.childProfileAvatarSolved
+                          ]}
+                        />
+                        <Text style={[
+                          styles.childProfileName,
+                          isSolved && styles.childProfileNameSolved
+                        ]}>
+                          {child.name}
+                        </Text>
+                        {isSolved && (
+                          <Ionicons
+                            name="checkmark-circle"
+                            size={16}
+                            color="#22c55e"
+                            style={styles.childProfileCheck}
+                          />
                         )}
                       </View>
-                    ))}
-                  </View>
-                )}
-
-                <View style={styles.quizFooter}>
-                  <Text style={styles.quizDate}>
-                    {quiz.quizDate === new Date().toISOString().split('T')[0]
-                      ? "오늘 생성"
-                      : quiz.quizDate}
-                  </Text>
+                    );
+                  })}
                 </View>
               </View>
-            ))
+              );
+            })
           ) : (
             <View style={{ padding: 20, alignItems: 'center' }}>
               <Text style={{ textAlign: "center", color: "#6b7280", marginBottom: 10 }}>
@@ -353,50 +408,6 @@ export default function ParentQuizScreen() {
                 퀴즈를 생성하면 여기에 표시됩니다.
               </Text>
             </View>
-          )}
-        </View>
-
-        {/* 아이의 퀴즈 현황 */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>아이의 퀴즈 현황</Text>
-          {children.length > 0 ? (
-            children.map((child, index) => {
-              // avatar_media_id를 기반으로 piggy 이미지 매칭
-              const piggyImages: { [key: string]: any } = {
-                piggy1: require('../../../../assets/images/piggy1.jpg'),
-                piggy2: require('../../../../assets/images/piggy2.jpg'),
-                piggy3: require('../../../../assets/images/piggy3.jpg'),
-              };
-              const piggyImage = piggyImages[child.avatar_media_id] || require('../../../../assets/images/piggy1.jpg');
-
-              return (
-                <TouchableOpacity
-                  key={child.profile_id}
-                  style={styles.childCard}
-                  onPress={() =>
-                    router.push({
-                      pathname: "/(parents)/quiz/children/[id]",
-                      params: { id: child.profile_id, name: child.name },
-                    })
-                  }
-                >
-                  <Image
-                    source={piggyImage}
-                    style={styles.childAvatar}
-                  />
-                  <View>
-                    <Text style={styles.childName}>{child.name}</Text>
-                    <Text style={styles.childInfo}>
-                      {child.birth_date ? new Date(child.birth_date).toLocaleDateString('ko-KR') : '생년월일 미등록'} · {child.gender || '성별 미등록'}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              );
-            })
-          ) : (
-            <Text style={{ textAlign: 'center', color: '#6b7280', padding: 20 }}>
-              등록된 자녀가 없습니다.
-            </Text>
           )}
         </View>
       </ScrollView>
@@ -500,35 +511,66 @@ summaryCard: {
     padding: 12,
     marginTop: 8,
   },
-  quizHeaderRow: {
+  quizHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    marginBottom: 12,
   },
-  quizQuestion: { fontSize: 13, fontWeight: "500", color: "#111827" },
-  quizAnswer: { fontSize: 12, color: "#374151", marginTop: 4 },
+  quizDate: {
+    fontSize: 11,
+    color: "#6b7280",
+  },
+  quizDateToday: {
+    color: "#2563eb",
+    fontWeight: "600",
+    fontSize: 12,
+  },
+  quizContentArea: {
+    marginTop: 4,
+  },
+  quizQuestion: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#111827",
+    marginBottom: 8,
+  },
+  quizAnswer: {
+    fontSize: 13,
+    color: "#374151",
+    marginBottom: 4,
+  },
+  quizReward: {
+    fontSize: 13,
+    color: "#2563eb",
+    fontWeight: "500",
+  },
   quizCategory: { fontSize: 11, color: "#6b7280" },
   quizStatus: { fontSize: 12, fontWeight: "600" },
 
-  actionRow: { flexDirection: "row" },
+  actionRow: {
+    flexDirection: "row",
+  },
   editButton: {
     borderWidth: 1,
     borderColor: "#2563eb",
     paddingHorizontal: 8,
-    paddingVertical: 2,
+    paddingVertical: 4,
     borderRadius: 6,
     marginRight: 6,
   },
-  editText: { fontSize: 12, color: "#2563eb" },
-  deleteButton: { paddingHorizontal: 6, paddingVertical: 2 },
-  deleteText: { fontSize: 12, color: "red" },
+  editText: { fontSize: 11, color: "#2563eb" },
+  deleteButton: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  deleteText: { fontSize: 11, color: "red" },
 
   quizFooter: {
     flexDirection: "row",
     justifyContent: "space-between",
     marginTop: 6,
   },
-  quizDate: { fontSize: 11, color: "#6b7280" },
 
   createButton: {
     backgroundColor: "#2563eb",
@@ -592,4 +634,42 @@ summaryCard: {
   },
   childName: { fontSize: 16, fontWeight: "bold", color: "#111827" },
   childInfo: { fontSize: 13, color: "#6b7280" },
+
+  // 자녀 프로필 스타일
+  childProfilesContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginTop: 8,
+    gap: 12,
+  },
+  childProfileItem: {
+    alignItems: "center",
+    width: 60,
+  },
+  childProfileAvatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    marginBottom: 4,
+    borderWidth: 2,
+    borderColor: "#e5e7eb",
+  },
+  childProfileAvatarSolved: {
+    borderColor: "#22c55e",
+    borderWidth: 3,
+  },
+  childProfileName: {
+    fontSize: 12,
+    color: "#6b7280",
+    textAlign: "center",
+  },
+  childProfileNameSolved: {
+    color: "#22c55e",
+    fontWeight: "600",
+  },
+  childProfileCheck: {
+    position: "absolute",
+    top: 0,
+    right: 5,
+  },
 });

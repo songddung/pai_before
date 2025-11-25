@@ -168,7 +168,7 @@ export default function RecommendScreen() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#f9fafb" }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#f9fafb" }} edges={['top']}>
       <ScrollView style={styles.container}>
         {/* Header */}
         <View style={styles.header}>

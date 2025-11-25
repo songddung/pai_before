@@ -121,6 +121,9 @@ export default function AnalyticsChildList() {
           };
           const piggyImage = piggyImages[item.avatar_media_id] || require('../../../../assets/images/piggy1.jpg');
 
+          // 성별을 한국어로 변환
+          const genderText = item.gender === 'MALE' ? '아들' : item.gender === 'FEMALE' ? '딸' : item.gender;
+
           return (
             <TouchableOpacity
               style={styles.card}
@@ -147,7 +150,7 @@ export default function AnalyticsChildList() {
               <View>
                 <Text style={styles.name}>{item.name}</Text>
                 <Text style={styles.subText}>
-                  {item.birth_date} · {item.gender}
+                  {item.birth_date} · {genderText}
                 </Text>
               </View>
             </TouchableOpacity>
@@ -172,12 +175,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#fff',
-    padding: 12,
+    padding: 20,
     borderRadius: 12,
-    marginBottom: 12,
+    marginBottom: 16,
     elevation: 2,
   },
-  avatar: { width: 50, height: 50, borderRadius: 25, marginRight: 12 },
-  name: { fontSize: 16, fontWeight: 'bold', color: '#111827' },
-  subText: { fontSize: 12, color: '#6b7280' },
+  avatar: { width: 70, height: 70, borderRadius: 35, marginRight: 16 },
+  name: { fontSize: 18, fontWeight: 'bold', color: '#111827' },
+  subText: { fontSize: 14, color: '#6b7280', marginTop: 4 },
 });

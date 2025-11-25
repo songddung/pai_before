@@ -11,6 +11,7 @@ import {
   Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from "../../domains/user/hooks/useAuth";
 
 
@@ -33,44 +34,68 @@ export default function QuizPage() {
 
     setLoading(true);
     try {
-      // 목데이터 - 3개의 퀴즈 샘플
-      const today = new Date();
-      const yesterday = new Date(today);
-      yesterday.setDate(yesterday.getDate() - 1);
+      // AsyncStorage에서 부모가 생성한 퀴즈 불러오기
+      const storedQuizzes = await AsyncStorage.getItem('mockQuizzes');
 
-      const mockQuizzes = [
-        {
-          id: '1',
-          question: '아빠가 가장 좋아하는 음식은 무엇일까요?',
-          reward: '용돈 1000원',
-          quizDate: today.toISOString().split('T')[0],
-          parentId: '1',
-          myResult: null, // 새로운 퀴즈
-        },
-        {
-          id: '2',
-          question: '엄마의 취미는 무엇일까요?',
-          reward: '간식 쿠폰',
-          quizDate: today.toISOString().split('T')[0],
-          parentId: '1',
-          myResult: {
-            isSolved: false,
-            totalAttempts: 2,
-          }, // 진행중
-        },
-        {
-          id: '3',
-          question: '아빠가 다니는 회사 이름은?',
-          reward: '게임 시간 30분',
-          quizDate: yesterday.toISOString().split('T')[0],
-          parentId: '1',
-          myResult: {
-            isSolved: true,
-            totalAttempts: 1,
-            score: 100,
-          }, // 완료
-        },
-      ];
+      let mockQuizzes: any[] = [];
+
+      if (storedQuizzes) {
+        const parentQuizzes = JSON.parse(storedQuizzes);
+        const today = new Date().toISOString().split('T')[0];
+
+        // 오늘 또는 오늘 이전 날짜의 퀴즈만 표시
+        mockQuizzes = parentQuizzes
+          .filter((quiz: any) => quiz.quizDate <= today)
+          .map((quiz: any) => ({
+            id: quiz.id,
+            question: quiz.question,
+            answer: quiz.answer,
+            hint: quiz.hint,
+            reward: quiz.reward,
+            quizDate: quiz.quizDate,
+            parentId: '1',
+            // childResults에서 현재 아이의 결과 찾기 (여기서는 임시로 첫 번째 결과 사용)
+            myResult: quiz.childResults && quiz.childResults.length > 0
+              ? {
+                  isSolved: quiz.childResults[0].isSolved,
+                  totalAttempts: quiz.childResults[0].totalAttempts,
+                  score: quiz.childResults[0].score,
+                }
+              : null,
+          }));
+      } else {
+        // AsyncStorage에 데이터가 없으면 기본 목데이터 사용
+        const today = new Date();
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+
+        mockQuizzes = [
+          {
+            id: '2',
+            question: '엄마의 취미는 무엇일까요?',
+            answer: '독서',
+            hint: '',
+            reward: '간식 쿠폰',
+            quizDate: today.toISOString().split('T')[0],
+            parentId: '1',
+            myResult: null,  // 새로운 퀴즈로 변경 (시연용)
+          },
+          {
+            id: '3',
+            question: '아빠가 다니는 회사 이름은?',
+            answer: '삼성',
+            hint: '대한민국 1등 기업',
+            reward: '게임 시간 30분',
+            quizDate: yesterday.toISOString().split('T')[0],
+            parentId: '1',
+            myResult: {
+              isSolved: true,
+              totalAttempts: 1,
+              score: 100,
+            },
+          },
+        ];
+      }
 
       setQuizzes(mockQuizzes);
 
@@ -84,6 +109,7 @@ export default function QuizPage() {
         new: newQuizzes,
       });
     } catch (err: any) {
+      console.error('퀴즈 불러오기 실패:', err);
       setQuizzes([]);
       setSummary({ completed: 0, inProgress: 0, new: 0 });
     } finally {
@@ -156,14 +182,13 @@ export default function QuizPage() {
           {item.myResult?.score ? (
             <Text style={styles.meta}>⭐ {item.myResult.score}점</Text>
           ) : null}
-          <Text style={[styles.status, { color: statusColor }]}>{status}</Text>
         </View>
       </TouchableOpacity>
     );
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#f9fafb" }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#f9fafb" }} edges={['top']}>
       <View style={styles.container}>
         {/* 🔹 헤더 (뒤로가기 + 제목) */}
         <View style={styles.header}>
@@ -173,7 +198,7 @@ export default function QuizPage() {
           <View>
             <Text style={styles.headerTitle}>부모님 퀴즈</Text>
           </View>
-          <View style={{ width: 24 }} /> {/* 오른쪽 자리 맞춤 */}
+          <View style={{ width: 24 }} />
         </View>
 
         <Text style={styles.headerDesc}>
