@@ -54,22 +54,22 @@ export default function AnalyticsChildList() {
           // 실패 시 mock 데이터 fallback
           const mockProfiles = [
             {
-              profile_id: 11,
+              profile_id: 2,
               user_id: 1,
               profile_type: 'CHILD',
-              name: '민준',
-              birth_date: '2018-05-12',
-              gender: 'MALE',
-              avatar_media_id: null,
+              name: '정유진',
+              birth_date: '2018-07-20',
+              gender: 'FEMALE',
+              avatar_media_id: 'piggy2',
             },
             {
-              profile_id: 12,
+              profile_id: 3,
               user_id: 1,
               profile_type: 'CHILD',
-              name: '유진',
-              birth_date: '2020-09-07',
-              gender: 'FEMALE',
-              avatar_media_id: null,
+              name: '김민규',
+              birth_date: '2020-05-10',
+              gender: 'MALE',
+              avatar_media_id: 'piggy3',
             },
           ];
           setChildren(mockProfiles);

@@ -1,5 +1,5 @@
 import { Tabs } from "expo-router";
-import { BarChart3, BookOpenCheck, Heart, Mic, MessageCircle } from "lucide-react-native";
+import { BarChart3, BookOpenCheck, Heart, Mic, MessageCircle, User } from "lucide-react-native";
 
 export default function ParentsLayout() {
   return (
@@ -47,6 +47,13 @@ export default function ParentsLayout() {
         options={{
           title: "추천",
           tabBarIcon: ({ color, size }) => <Heart color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: "프로필",
+          tabBarIcon: ({ color, size }) => <User color={color} size={size} />,
         }}
       />
     </Tabs>

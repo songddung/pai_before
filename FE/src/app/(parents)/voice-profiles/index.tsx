@@ -8,55 +8,56 @@ import {
   Text,
   TouchableOpacity,
   View,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useAuth } from "../../../domains/user/hooks/useAuth";
-import { profileApi } from "../../../domains/user/api/userApi";
 
 export default function VoiceProfilesScreen() {
   const router = useRouter();
-  const { user, accessToken, isAuthenticated } = useAuth();
   const [voiceProfiles, setVoiceProfiles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const accountId = user?.userId || "user123";
-
-  // 프로필 조회 함수
+  // 프로필 조회 함수 (포트폴리오용 Mock)
   const fetchProfiles = useCallback(async () => {
-    if (!isAuthenticated || !accessToken) {
-      router.replace('/login');
-      return;
-    }
-
     setLoading(true);
     try {
-      console.log('음성 프로필 목록 조회 시작, 인증 상태:', { isAuthenticated, accessToken: !!accessToken });
+      console.log('음성 프로필 목록 조회 시작 (Mock 모드)');
 
-      // profileApi를 사용하여 프로필 조회
-      const profiles = await profileApi.getAllProfiles();
-      console.log('조회된 전체 프로필:', profiles);
+      // AsyncStorage에서 캐시된 Mock 데이터 가져오기
+      const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+      const cachedData = await AsyncStorage.getItem('mock_voice_profiles');
 
-      // 부모 프로필이면서 음성이 등록된 프로필만 필터링
-      const parentProfilesWithVoice = profiles.filter((profile: any) =>
-        profile.profile_type === 'PARENT' && profile.voice_media_id
-      );
+      let profiles = [];
+      if (cachedData) {
+        profiles = JSON.parse(cachedData);
+        console.log('캐시된 음성 프로필 로드:', profiles);
+      } else {
+        console.log('캐시된 데이터 없음 - 빈 목록 표시');
+      }
 
-      console.log('음성이 등록된 부모 프로필:', parentProfilesWithVoice);
-      setVoiceProfiles(parentProfilesWithVoice);
+      setVoiceProfiles(profiles);
     } catch (err: any) {
       console.error("프로필 조회 실패:", err);
-      console.error("오류 상세:", {
-        status: err.response?.status,
-        data: err.response?.data,
-        message: err.message
-      });
-      if (err.response?.status === 401) {
-        router.replace('/login');
-      }
+      setVoiceProfiles([]);
     } finally {
       setLoading(false);
     }
-  }, [isAuthenticated, accessToken, router]);
+  }, []);
+
+  // 캐시 초기화 함수 (모든 AsyncStorage 데이터 삭제)
+  const clearCache = async () => {
+    try {
+      const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+
+      // 모든 AsyncStorage 데이터 삭제
+      await AsyncStorage.clear();
+
+      console.log('모든 캐시 초기화 완료 (음성 프로필, 퀴즈 등)');
+      fetchProfiles(); // 새로고침
+    } catch (err) {
+      console.error('캐시 초기화 실패:', err);
+    }
+  };
 
   // 초기 로드
   useEffect(() => {
@@ -90,12 +91,20 @@ export default function VoiceProfilesScreen() {
           <Ionicons name="chevron-back" size={24} color="#111827" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>음성 프로필 목록</Text>
-        <TouchableOpacity
-          style={styles.refreshButton}
-          onPress={fetchProfiles}
-        >
-          <Ionicons name="refresh" size={20} color="#6366f1" />
-        </TouchableOpacity>
+        <View style={styles.headerButtons}>
+          <TouchableOpacity
+            style={styles.clearButton}
+            onPress={clearCache}
+          >
+            <Ionicons name="trash-outline" size={20} color="#ef4444" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.refreshButton}
+            onPress={fetchProfiles}
+          >
+            <Ionicons name="refresh" size={20} color="#6366f1" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* 프로필 리스트 */}
@@ -169,6 +178,14 @@ const styles = StyleSheet.create({
   },
   backButton: {
     padding: 4,
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  clearButton: {
+    padding: 4,
+    marginRight: 8,
   },
   refreshButton: {
     padding: 4,

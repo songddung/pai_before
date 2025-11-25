@@ -3,7 +3,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { TrendingUp } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import {
-  Alert,
   Dimensions,
   ScrollView,
   StyleSheet,
@@ -13,16 +12,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, Text as SvgText } from 'react-native-svg';
-import { arkApi } from '../../../domains/ark/api/arkApi';
-import { useAuth } from '../../../domains/user/hooks/useAuth';
-import dayjs from 'dayjs';
-import isoWeek from 'dayjs/plugin/isoWeek'; // 월요일 시작 기준 주간 계산
-import isSameOrBefore from 'dayjs/plugin/isSameOrBefore';
-import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
-
-dayjs.extend(isoWeek);
-dayjs.extend(isSameOrBefore);
-dayjs.extend(isSameOrAfter);
 
 type TabKey = 'overview' | 'weekly' | 'interest';
 
@@ -49,7 +38,6 @@ function Progress({
 export default function ChildAnalyticsScreen() {
   const { childId, name } = useLocalSearchParams();
   const router = useRouter();
-  const { isAuthenticated, accessToken } = useAuth();
 
   const [active, setActive] = useState<TabKey>('overview');
   const [loading, setLoading] = useState(false);
@@ -64,115 +52,52 @@ export default function ChildAnalyticsScreen() {
 
   useEffect(() => {
     const fetchAnalysis = async () => {
-      if (!isAuthenticated || !accessToken || !childId) {
-        router.replace('/login');
-        return;
-      }
-
       setLoading(true);
-      try {
-        const analysisParams = { child_id: childId.toString(), limit: 10 };
-        const analysisData = await arkApi.getAnalysis(analysisParams);
 
-        if (analysisData && analysisData.length > 0) {
-          // ---------------- 카테고리 집계 로직 ----------------
-          const categoryCounts: { [key: string]: number } = {};
-          analysisData.forEach((analysis: any) => {
-            if (analysis.category) {
-              categoryCounts[analysis.category] = (categoryCounts[analysis.category] || 0) + 1;
-            }
-          });
+      // 포트폴리오용 Mock 데이터 (통일성 있게 설계)
+      const mockInterestTopics = [
+        { topic: '동물', count: 8 },
+        { topic: '우주', count: 6 },
+        { topic: '공룡', count: 5 },
+        { topic: '자연', count: 4 },
+        { topic: '과학', count: 3 },
+      ];
 
-          const topicsList = Object.entries(categoryCounts)
-            .sort(([, a], [, b]) => b - a)
-            .slice(0, 5)
-            .map(([topic, count]) => ({ topic, count }));
+      // 주간 활동 데이터 (관심사 주제에 맞게 질문 수 분배)
+      const mockWeeklyActivity = [
+        { day: '월', questions: 4, engagement: 92 },
+        { day: '화', questions: 3, engagement: 88 },
+        { day: '수', questions: 5, engagement: 95 },
+        { day: '목', questions: 2, engagement: 80 },
+        { day: '금', questions: 4, engagement: 90 },
+        { day: '토', questions: 6, engagement: 96 },
+        { day: '일', questions: 2, engagement: 85 },
+      ];
 
-          setInterestTopics(topicsList);
+      // 총 질문 수 = 관심사 count 합계 (26개)
+      const totalQuestions = mockInterestTopics.reduce((sum, t) => sum + t.count, 0);
 
-          // ---------------- 핵심 지표 ----------------
-          // 실제 총 질문 수 계산
-          const totalQuestions = analysisData.length;
+      // 참여 일수 = 주간 활동에서 질문이 1개 이상인 날 (7일)
+      const activeDays = mockWeeklyActivity.filter(d => d.questions > 0).length;
 
-          // 참여 일수 계산 (이번 주 기준)
-          const startOfWeek = dayjs().startOf('isoWeek'); // 월요일
-          const endOfWeek = dayjs().endOf('isoWeek'); // 일요일
+      setOverview({
+        totalQuestions: totalQuestions,
+        activeDays: activeDays,
+        topTopic: mockInterestTopics[0].topic,
+      });
 
-          const uniqueDays = new Set(
-            analysisData
-              .map((item: any) => {
-                // analysis_date 또는 created_at 필드 사용
-                const dateField = item.analysis_date || item.created_at;
-                return dayjs(dateField);
-              })
-              .filter((d) =>
-                d.isSameOrAfter(startOfWeek) && d.isSameOrBefore(endOfWeek)
-              )
-              .map((d) => d.format('YYYY-MM-DD'))
-          );
+      setWeeklyActivity(mockWeeklyActivity);
+      setInterestTopics(mockInterestTopics);
 
-          const activeDays = uniqueDays.size;
-
-          setOverview({
-            totalQuestions: totalQuestions,
-            activeDays: activeDays,
-            topTopic: topicsList[0]?.topic ?? 'N/A',
-          });
-
-          // ---------------- 주간 활동 (mock) ----------------
-          setWeeklyActivity([
-            { day: '월', questions: 3, engagement: 85 },
-            { day: '화', questions: 2, engagement: 90 },
-            { day: '수', questions: 4, engagement: 88 },
-            { day: '목', questions: 1, engagement: 75 },
-            { day: '금', questions: 3, engagement: 95 },
-            { day: '토', questions: 5, engagement: 92 },
-            { day: '일', questions: 2, engagement: 80 },
-          ]);
-        } else {
-          setOverview({
-            totalQuestions: 0,
-            activeDays: 0,
-            topTopic: 'N/A',
-          });
-          setWeeklyActivity([]);
-          setInterestTopics([]);
-        }
-      } catch (err: any) {
-        Alert.alert('알림', '분석 데이터 조회 실패, 샘플 데이터 표시합니다.');
-
-        // ---------------- 샘플 데이터 fallback ----------------
-        setOverview({
-          totalQuestions: 15,
-          activeDays: 5,
-          topTopic: '동물',
-        });
-        setWeeklyActivity([
-          { day: '월', questions: 3, engagement: 85 },
-          { day: '화', questions: 2, engagement: 90 },
-          { day: '수', questions: 4, engagement: 88 },
-          { day: '목', questions: 1, engagement: 75 },
-          { day: '금', questions: 3, engagement: 95 },
-          { day: '토', questions: 5, engagement: 92 },
-          { day: '일', questions: 2, engagement: 80 },
-        ]);
-        setInterestTopics([
-          { topic: '동물', count: 2 },
-          { topic: '자연', count: 1 },
-          { topic: '날씨', count: 1 },
-          { topic: '생활', count: 1 },
-          { topic: '과학', count: 1 },
-        ]);
-      } finally {
-        setLoading(false);
-      }
+      console.log('Mock 분석 데이터 로드 완료 (포트폴리오용)');
+      setLoading(false);
     };
 
     fetchAnalysis();
-  }, [childId, isAuthenticated, accessToken]);
+  }, [childId]);
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={styles.safe} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.iconBtn}>
@@ -289,33 +214,22 @@ function OverviewContent({ overview }: { overview: { totalQuestions: number; act
 
 /* ---------- Weekly (주간 활동) ---------- */
 function WeeklyContent({ weeklyActivity }: any) {
+  // 최대 질문 수 계산 (바가 벗어나지 않도록)
+  const maxQuestions = Math.max(...weeklyActivity.map((item: any) => item.questions));
+
   return (
     <View>
       <View style={styles.fullCard}>
         <Text style={styles.cardTitle}>📊 주간 활동 패턴</Text>
-        <Text style={styles.cardSubSmall}>요일별 질문 수와 참여도</Text>
+        <Text style={styles.cardSubSmall}>요일별 질문 수</Text>
         {weeklyActivity.map((item: any, idx: number) => (
           <View key={idx} style={styles.weekRow}>
             <Text style={{ width: 24 }}>{item.day}</Text>
             <View style={{ flex: 1, marginHorizontal: 8 }}>
-              <Progress value={(item.questions / 5) * 100} color="#3b82f6" />
+              <Progress value={(item.questions / maxQuestions) * 100} color="#3b82f6" />
             </View>
             <Text style={{ width: 36, textAlign: 'right' }}>
               {item.questions}개
-            </Text>
-            <Text
-              style={{
-                width: 46,
-                textAlign: 'right',
-                color:
-                  item.engagement >= 90
-                    ? 'green'
-                    : item.engagement < 80
-                      ? 'red'
-                      : 'orange',
-              }}
-            >
-              {item.engagement}%
             </Text>
           </View>
         ))}
@@ -369,7 +283,7 @@ function InterestContent({ interestTopics }: any) {
 
       // 경계 체크
       if (x - radius < 0 || x + radius > chartWidth ||
-          y - radius < 0 || y + radius > chartHeight) {
+        y - radius < 0 || y + radius > chartHeight) {
         continue;
       }
 
@@ -478,7 +392,6 @@ function InterestContent({ interestTopics }: any) {
 
         {/* 범례 */}
         <View style={styles.legendContainer}>
-          <Text style={styles.legendTitle}>범례</Text>
           <View style={styles.legendGrid}>
             {bubbleData.map((bubble, index) => (
               <View key={index} style={styles.legendItem}>

@@ -1,15 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Audio } from "expo-av";
-import { useRouter, useLocalSearchParams } from "expo-router";
+import { useRouter } from "expo-router";
 import React, { useState, useEffect } from "react";
 import { StyleSheet, Text, TouchableOpacity, View, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useAuth } from "../../../domains/user/hooks/useAuth";
-import { profileApi } from "../../../domains/user/api/userApi";
 
 export default function VoiceLearningScreen() {
   const router = useRouter();
-  const { user, accessToken, isAuthenticated } = useAuth();
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [recordedFile, setRecordedFile] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -18,54 +15,30 @@ export default function VoiceLearningScreen() {
   const [sound, setSound] = useState<Audio.Sound | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
 
-  // JWT 토큰에서 현재 선택된 프로필 정보 확인
+  // JWT 토큰에서 현재 선택된 프로필 정보 확인 (포트폴리오용 Mock)
   useEffect(() => {
     const checkProfile = async () => {
-      if (!isAuthenticated || !accessToken) {
-        router.replace('/login');
-        return;
-      }
+      // Mock 프로필 데이터로 우회 (포트폴리오 데모용)
+      const mockProfile = {
+        profile_id: 'demo-parent-1',
+        profile_type: 'PARENT',
+        profile_name: '부모님',
+        sub: 'demo-user-123'
+      };
 
-      try {
-        const { tokenUtils } = await import('../../../shared/utils/token');
-        const tokenData = tokenUtils.decodeToken(accessToken);
+      console.log('음성 등록 화면 로드됨 (Mock 모드)');
+      console.log('Mock 프로필 데이터:', mockProfile);
 
-        console.log('음성 등록 화면 로드됨');
-        console.log('사용자:', user?.userId);
-        console.log('토큰 데이터:', tokenData);
-
-        if (!tokenData || !tokenData.profile_id) {
-          console.log('프로필 정보가 없음. profile-select로 이동');
-          Alert.alert('알림', '프로필을 먼저 선택해주세요.', [
-            { text: '확인', onPress: () => router.replace('/profile-select') }
-          ]);
-          return;
-        }
-
-        if (tokenData.profile_type !== 'PARENT') {
-          console.log('부모 프로필이 아님:', tokenData.profile_type);
-          Alert.alert('오류', '음성 등록은 부모 프로필만 가능합니다.', [
-            { text: '확인', onPress: () => router.back() }
-          ]);
-          return;
-        }
-
-        setCurrentProfile(tokenData);
-        console.log('현재 프로필 설정 완료:', {
-          profileId: tokenData.profile_id,
-          profileType: tokenData.profile_type,
-          profileName: tokenData.profile_name
-        });
-      } catch (error) {
-        console.error('프로필 확인 오류:', error);
-        Alert.alert('오류', '프로필 정보를 확인할 수 없습니다.', [
-          { text: '확인', onPress: () => router.back() }
-        ]);
-      }
+      setCurrentProfile(mockProfile);
+      console.log('현재 프로필 설정 완료:', {
+        profileId: mockProfile.profile_id,
+        profileType: mockProfile.profile_type,
+        profileName: mockProfile.profile_name
+      });
     };
 
     checkProfile();
-  }, [isAuthenticated, accessToken]);
+  }, []);
 
   // 녹음 시간 추적
   useEffect(() => {
@@ -170,64 +143,53 @@ export default function VoiceLearningScreen() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // 🔹 서버 업로드
+  // 🔹 서버 업로드 (포트폴리오용 Mock)
   const uploadVoice = async () => {
     if (!recordedFile) {
       Alert.alert('오류', '녹음된 파일이 없습니다.');
       return;
     }
 
-    if (!isAuthenticated || !accessToken) {
-      Alert.alert('오류', '로그인이 필요합니다.');
-      router.replace('/login');
-      return;
-    }
-
     setIsUploading(true);
 
     try {
-      // JWT 토큰에서 현재 선택된 프로필 정보 추출
-      console.log('현재 액세스 토큰:', accessToken ? '존재함' : '없음');
-
-      const { tokenUtils } = await import('../../../shared/utils/token');
-      const tokenData = tokenUtils.decodeToken(accessToken);
-
-      console.log('디코딩된 토큰 데이터:', tokenData);
-
-      if (!tokenData) {
-        Alert.alert('오류', '토큰을 디코딩할 수 없습니다. 다시 로그인해주세요.');
-        router.replace('/login');
-        return;
-      }
-
-      // currentProfile이 설정되어 있으면 그것을 사용, 없으면 토큰에서 추출
-      let profileId: string;
-
-      if (currentProfile && currentProfile.profile_id) {
-        profileId = currentProfile.profile_id.toString();
-        console.log('현재 설정된 프로필 사용:', profileId);
-      } else if (tokenData.profile_id) {
-        profileId = tokenData.profile_id.toString();
-        console.log('토큰에서 프로필 ID 추출:', profileId);
-      } else {
-        console.log('프로필 ID를 찾을 수 없음');
-        Alert.alert('알림', '프로필을 먼저 선택해주세요.', [
-          { text: '확인', onPress: () => router.replace('/profile-select') }
-        ]);
-        return;
-      }
-
-      console.log('음성 업로드 시작:', {
-        profileId,
-        profileType: tokenData.profile_type,
-        profileName: tokenData.profile_name,
-        recordedFile,
-        userId: user?.userId,
-        tokenSub: tokenData.sub
+      // Mock 데이터로 시뮬레이션 (포트폴리오 데모용)
+      console.log('음성 업로드 시작 (Mock 모드):', {
+        profileId: currentProfile?.profile_id,
+        profileType: currentProfile?.profile_type,
+        profileName: currentProfile?.profile_name,
+        recordedFile
       });
 
-      const result = await profileApi.registerVoice(profileId, recordedFile);
-      console.log("음성 등록 성공:", result);
+      // 업로드 시뮬레이션 (1.5초 대기)
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
+      // Mock 음성 프로필 데이터 생성
+      const mockVoiceProfile = {
+        profile_id: currentProfile?.profile_id || 'demo-parent-1',
+        name: '송현광',
+        birth_date: '1997-04-01',
+        profile_type: 'PARENT',
+        avatar_media_id: 'piggy1',
+        voice_media_id: 'voice-' + Date.now(),
+        created_at: new Date().toISOString()
+      };
+
+      // AsyncStorage를 사용하여 캐시 저장
+      const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+
+      // 기존 음성 프로필 목록 가져오기
+      const existingData = await AsyncStorage.getItem('mock_voice_profiles');
+      let voiceProfiles = existingData ? JSON.parse(existingData) : [];
+
+      // 새 프로필 추가
+      voiceProfiles.push(mockVoiceProfile);
+
+      // 저장
+      await AsyncStorage.setItem('mock_voice_profiles', JSON.stringify(voiceProfiles));
+
+      console.log("음성 등록 성공 (Mock):", mockVoiceProfile);
+      console.log("저장된 전체 프로필:", voiceProfiles);
 
       Alert.alert('성공', '음성 학습이 완료되었습니다!', [
         {
@@ -240,8 +202,7 @@ export default function VoiceLearningScreen() {
       ]);
     } catch (err: any) {
       console.error("음성 업로드 실패:", err);
-      const errorMessage = err.response?.data?.message || err.message || '음성 업로드 중 오류가 발생했습니다.';
-      Alert.alert('실패', errorMessage);
+      Alert.alert('실패', '음성 업로드 중 오류가 발생했습니다.');
     } finally {
       setIsUploading(false);
     }

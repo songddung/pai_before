@@ -94,17 +94,17 @@ export default function ParentQuizScreen() {
   //
   const mockChildren = [
     {
-      id: "1",
-      name: "민준",
-      birth: "2018-05-12",
-      gender: "male",
+      id: "2",
+      name: "정유진",
+      birth: "2018-07-20",
+      gender: "female",
       avatar: "https://i.pravatar.cc/150?img=3",
     },
     {
-      id: "2",
-      name: "유진",
-      birth: "2020-09-07",
-      gender: "female",
+      id: "3",
+      name: "김민규",
+      birth: "2020-05-10",
+      gender: "male",
       avatar: "https://i.pravatar.cc/150?img=4",
     },
   ];
