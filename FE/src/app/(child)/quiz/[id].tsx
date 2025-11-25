@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   FlatList,
   StyleSheet,
@@ -32,6 +32,8 @@ export default function QuizDetailPage() {
   const [completed, setCompleted] = useState(false);
   const [quiz, setQuiz] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [newAttempts, setNewAttempts] = useState(0); // 새로 시도한 횟수
+  const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
     const fetchQuizDetail = async () => {
@@ -51,9 +53,10 @@ export default function QuizDetailPage() {
       setAnswers([]);
       setInput('');
       setCompleted(false);
+      setNewAttempts(0);
 
       try {
-        // 목데이터
+        // 유진이 전용 목데이터
         const today = new Date();
         const yesterday = new Date(today);
         yesterday.setDate(yesterday.getDate() - 1);
@@ -63,6 +66,7 @@ export default function QuizDetailPage() {
             id: '1',
             question: '아빠가 가장 좋아하는 음식은 무엇일까요?',
             answer: '김치찌개',
+            hint: '매워요',
             reward: '용돈 1000원',
             quizDate: today.toISOString().split('T')[0],
             myResult: null,
@@ -79,11 +83,13 @@ export default function QuizDetailPage() {
             id: '2',
             question: '엄마의 취미는 무엇일까요?',
             answer: '독서',
+            hint: '',
             reward: '간식 쿠폰',
             quizDate: today.toISOString().split('T')[0],
             myResult: {
               isSolved: false,
-              totalAttempts: 2,
+              totalAttempts: 1,
+              score: 0,
             },
             exampleAnswers: [
               { text: '뜨개질', similarity: 25 },
@@ -98,16 +104,17 @@ export default function QuizDetailPage() {
             id: '3',
             question: '아빠가 다니는 회사 이름은?',
             answer: '삼성',
+            hint: '갤럭시',
             reward: '게임 시간 30분',
             quizDate: yesterday.toISOString().split('T')[0],
             myResult: {
               isSolved: true,
-              totalAttempts: 1,
+              totalAttempts: 3,
               score: 100,
             },
             exampleAnswers: [
-              { text: '삼성전자', similarity: 80 },
-              { text: '삼성', similarity: 100 },
+              { text: '삼성', similarity: 80 },
+              { text: '삼성전자', similarity: 100 },
             ],
           },
         ];
@@ -124,15 +131,33 @@ export default function QuizDetailPage() {
               setAnswers([
                 {
                   id: '1',
-                  text: '삼성전자',
-                  similarity: 80,
+                  text: 'LG',
+                  similarity: 30,
                   correct: false,
                 },
                 {
                   id: '2',
                   text: '삼성',
+                  similarity: 80,
+                  correct: false,
+                },
+                {
+                  id: '3',
+                  text: '삼성전자',
                   similarity: 100,
                   correct: true,
+                },
+              ]);
+            }
+          } else if (targetQuiz.myResult && !targetQuiz.myResult.isSolved) {
+            // 진행중인 퀴즈는 이전 시도 답변을 표시
+            if (targetQuiz.id === '2') {
+              setAnswers([
+                {
+                  id: '1',
+                  text: '뜨개질',
+                  similarity: 25,
+                  correct: false,
                 },
               ]);
             }
@@ -224,6 +249,12 @@ export default function QuizDetailPage() {
 
       setAnswers((prev) => [...prev, newAnswer]);
       setInput("");
+      setNewAttempts((prev) => prev + 1);
+
+      // 새 답변이 추가되면 자동으로 스크롤
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
 
       if (isCorrect) {
         setCompleted(true);
@@ -242,11 +273,11 @@ export default function QuizDetailPage() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
+    <SafeAreaView style={styles.safeArea} edges={["top"]}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+        keyboardVerticalOffset={0}
       >
         {/* 헤더 */}
         <View style={styles.header}>
@@ -256,20 +287,25 @@ export default function QuizDetailPage() {
         <Text style={styles.title}>퀴즈 #{quiz.id}</Text>
       </View>
       <Text style={styles.meta}>
-        보상: {quiz.reward || '없음'} | 시도: {answers.length}번 | 날짜: {quiz.quizDate}
+        보상: {quiz.reward || '없음'} | 시도: {(quiz.myResult?.totalAttempts || 0) + newAttempts}번 | 날짜: {quiz.quizDate}
       </Text>
 
       {/* 문제 */}
       <View style={styles.questionBox}>
         <Text style={styles.questionLabel}>퀴즈 문제</Text>
         <Text style={styles.question}>{quiz.question}</Text>
+        {quiz.hint ? (
+          <Text style={styles.hint}>💡 힌트: {quiz.hint}</Text>
+        ) : null}
       </View>
 
       {/* 답변 리스트 */}
       <FlatList
+        ref={flatListRef}
         data={answers}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ paddingBottom: 20 }}
+        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
         renderItem={({ item }) => (
           <View
             style={[
@@ -363,6 +399,7 @@ const styles = StyleSheet.create({
   },
   questionLabel: { fontWeight: "bold", marginBottom: 6 },
   question: { fontSize: 15 },
+  hint: { fontSize: 13, color: "#7c3aed", marginTop: 8, fontStyle: "italic" },
 
   answerRow: { marginHorizontal: 16, marginBottom: 14, maxWidth: "80%" },
   answerLeft: { alignSelf: "flex-start" },

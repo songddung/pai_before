@@ -21,16 +21,11 @@ export default function QuizEditScreen() {
   const { id } = useLocalSearchParams(); // URL에서 quiz id 받기
 
   // 임시 상태 (실제론 API 요청으로 불러오기)
-  const [question, setQuestion] = useState("아빠가 가장 좋아하는 음식은 무엇일까요?");
-  const [answer, setAnswer] = useState("김치찌개");
-  const [hint, setHint] = useState("한국 대표 음식이에요");
-  const [reward, setReward] = useState("용돈 1000원");
-  const [quizDate, setQuizDate] = useState(() => {
-    const today = new Date();
-    const threeDaysLater = new Date(today);
-    threeDaysLater.setDate(threeDaysLater.getDate() + 3);
-    return threeDaysLater.toISOString().split('T')[0];
-  });
+  const [question, setQuestion] = useState("아빠가 가장 좋아하는 운동은?");
+  const [answer, setAnswer] = useState("야구");
+  const [hint, setHint] = useState("기아타이거즈");
+  const [reward, setReward] = useState("용돈 500원");
+  const [quizDate, setQuizDate] = useState("2025-11-27");
 
   const handleSave = async () => {
     try {

@@ -64,12 +64,22 @@ export default function QuizPage() {
               : null,
           }));
       } else {
-        // AsyncStorage에 데이터가 없으면 기본 목데이터 사용
+        // 유진이 전용 목데이터
         const today = new Date();
         const yesterday = new Date(today);
         yesterday.setDate(yesterday.getDate() - 1);
 
         mockQuizzes = [
+          {
+            id: '1',
+            question: '아빠가 가장 좋아하는 음식은 무엇일까요?',
+            answer: '김치찌개',
+            hint: '매워요',
+            reward: '용돈 1000원',
+            quizDate: today.toISOString().split('T')[0],
+            parentId: '1',
+            myResult: null, // 안 풀었음 (오늘 퀴즈)
+          },
           {
             id: '2',
             question: '엄마의 취미는 무엇일까요?',
@@ -78,35 +88,39 @@ export default function QuizPage() {
             reward: '간식 쿠폰',
             quizDate: today.toISOString().split('T')[0],
             parentId: '1',
-            myResult: null,  // 새로운 퀴즈로 변경 (시연용)
+            myResult: {
+              isSolved: false, // 못 맞췄음
+              totalAttempts: 1,
+              score: 0,
+            }, // 오늘 퀴즈
           },
           {
             id: '3',
             question: '아빠가 다니는 회사 이름은?',
             answer: '삼성',
-            hint: '대한민국 1등 기업',
+            hint: '갤럭시',
             reward: '게임 시간 30분',
             quizDate: yesterday.toISOString().split('T')[0],
             parentId: '1',
             myResult: {
-              isSolved: true,
-              totalAttempts: 1,
+              isSolved: true, // 맞췄음
+              totalAttempts: 3,
               score: 100,
-            },
+            }, // 어제 퀴즈
           },
         ];
       }
 
       setQuizzes(mockQuizzes);
 
-      const completed = mockQuizzes.filter((q: any) => q.myResult?.isSolved).length;
-      const inProgress = mockQuizzes.filter((q: any) => q.myResult && !q.myResult.isSolved).length;
-      const newQuizzes = mockQuizzes.filter((q: any) => !q.myResult).length;
+      const today = new Date().toISOString().split('T')[0];
+      const completed = mockQuizzes.filter((q: any) => q.quizDate < today).length;
+      const inProgress = mockQuizzes.filter((q: any) => q.quizDate === today).length;
 
       setSummary({
         completed,
         inProgress,
-        new: newQuizzes,
+        new: 0,
       });
     } catch (err: any) {
       console.error('퀴즈 불러오기 실패:', err);
@@ -130,21 +144,22 @@ export default function QuizPage() {
   );
 
   const renderItem = ({ item }: { item: any }) => {
-    // API 데이터에서 상태 계산
+    // 날짜 기준으로 상태 계산
+    const today = new Date().toISOString().split('T')[0];
     let status = '새로운';
     let statusColor = '#16a34a';
     let icon = <Ionicons name="play-circle" size={20} color="#fff" />;
 
-    if (item.myResult) {
-      if (item.myResult.isSolved) {
-        status = '완료';
-        statusColor = '#22c55e';
-        icon = <Ionicons name="checkmark-circle" size={20} color="#22c55e" />;
-      } else {
-        status = '진행중';
-        statusColor = '#f59e0b';
-        icon = <Ionicons name="time" size={20} color="#f59e0b" />;
-      }
+    if (item.quizDate < today) {
+      // 어제 이전 퀴즈 = 완료
+      status = '완료';
+      statusColor = '#22c55e';
+      icon = <Ionicons name="checkmark-circle" size={20} color="#22c55e" />;
+    } else if (item.quizDate === today) {
+      // 오늘 퀴즈 = 진행중
+      status = '진행중';
+      statusColor = '#f59e0b';
+      icon = <Ionicons name="time" size={20} color="#f59e0b" />;
     }
 
     return (
@@ -179,9 +194,6 @@ export default function QuizPage() {
           {item.myResult?.totalAttempts ? (
             <Text style={styles.meta}>📝 {item.myResult.totalAttempts}번 시도</Text>
           ) : null}
-          {item.myResult?.score ? (
-            <Text style={styles.meta}>⭐ {item.myResult.score}점</Text>
-          ) : null}
         </View>
       </TouchableOpacity>
     );
@@ -215,10 +227,6 @@ export default function QuizPage() {
           <View style={styles.summaryCard}>
             <Text style={styles.summaryNumber}>{summary.inProgress}</Text>
             <Text style={styles.summaryLabel}>진행중</Text>
-          </View>
-          <View style={styles.summaryCard}>
-            <Text style={styles.summaryNumber}>{summary.new}</Text>
-            <Text style={styles.summaryLabel}>새로운</Text>
           </View>
         </View>
 

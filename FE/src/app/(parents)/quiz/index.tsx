@@ -95,7 +95,7 @@ export default function ParentQuizScreen() {
             id: '3',
             question: '아빠가 다니는 회사 이름은?',
             answer: '삼성',
-            hint: '대한민국 1등 기업',
+            hint: '갤럭시',
             reward: '게임 시간 30분',
             category: '일상',
             quizDate: yesterday.toISOString().split('T')[0],
